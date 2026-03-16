@@ -96,7 +96,7 @@ SuturaSec/
 ### 1. Cloner le dépôt
 
 ```bash
-git clone https://github.com/TON_USERNAME/SuturaSec.git
+git clone https://github.com/robsjean/SuturaSec.git
 cd SuturaSec/backend
 ```
 
