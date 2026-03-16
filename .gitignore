@@ -1,0 +1,47 @@
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ===== Environnements virtuels =====
+venv/
+env/
+.venv/
+ENV/
+
+# ===== Variables d'environnement (NE JAMAIS COMMITTER) =====
+.env
+*.env
+!.env.example
+
+# ===== Base de données =====
+*.db
+*.sqlite
+*.sqlite3
+
+# ===== Logs =====
+*.log
+logs/
+
+# ===== IDEs =====
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ===== Claude Code =====
+.claude/
+
+# ===== Alembic =====
+alembic/versions/
+
+# ===== Node (au cas où) =====
+node_modules/
