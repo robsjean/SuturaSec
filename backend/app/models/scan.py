@@ -34,6 +34,7 @@ class Vulnerability(Base):
     category = Column(String, nullable=True)  # OWASP category or CVE type
     evidence = Column(Text, nullable=True)
     remediation = Column(Text, nullable=True)
+    attack_techniques = Column(JSON, nullable=True)
     discovered_at = Column(DateTime, default=datetime.utcnow)
 
     scan = relationship("Scan", back_populates="vulnerabilities")

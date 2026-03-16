@@ -20,6 +20,7 @@ def _run_scan(scan_id: int, db_url: str):
     from app.scanners.web_scanner import WebScanner, compute_risk_score, generate_summary
     from app.scanners.network_scanner import NetworkScanner
     from app.services.ai_engine import enrich_scan_with_ai
+    from app.services.attack_mapping import get_attack_techniques
 
     connect_args = {"check_same_thread": False} if "sqlite" in db_url else {}
     engine = create_engine(db_url, connect_args=connect_args)
@@ -51,6 +52,7 @@ def _run_scan(scan_id: int, db_url: str):
                 category=f.category,
                 evidence=f.evidence,
                 remediation=f.remediation,
+                attack_techniques=get_attack_techniques(f.category),
             )
             for f in findings
         ]

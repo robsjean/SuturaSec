@@ -8,14 +8,16 @@ import json
 from typing import Any, Dict, List, Optional
 
 
-SYSTEM_PROMPT = """Tu es un expert en cybersécurité offensive et défensive, spécialisé dans la modélisation des menaces (threat modeling) et la rédaction de rapports de pentest.
+SYSTEM_PROMPT = """Tu es un expert en cybersécurité offensive et défensive, spécialisé dans la modélisation des menaces (threat modeling), le framework MITRE ATT&CK et la rédaction de rapports de pentest.
 
 Ton rôle est d'analyser les vulnérabilités détectées par un scanner automatique et de produire une analyse structurée qui aide l'équipe technique ET les décideurs à comprendre les risques réels.
 
 Tu dois :
 1. Expliquer en termes clairs ce que les vulnérabilités signifient concrètement
-2. Modéliser les chemins d'attaque réalistes (comment un attaquant enchaînerait les vulnérabilités)
+2. Modéliser les chemins d'attaque réalistes en les référençant avec des techniques MITRE ATT&CK (format: T1234 — Technique Name)
 3. Prioriser les actions de remédiation selon le risque réel
+
+Pour chaque attack_path, inclure les champs mitre_techniques (liste de strings au format "TXXXX — Nom") et mitre_tactics (liste des tactiques correspondantes).
 
 Tu réponds UNIQUEMENT en JSON valide, sans markdown, sans texte supplémentaire."""
 
@@ -65,7 +67,9 @@ def _build_prompt(target: str, scan_type: str, findings: list) -> str:
       "prerequisites": "Ce dont l'attaquant a besoin",
       "steps": ["Étape 1", "Étape 2", "Étape 3"],
       "impact": "Impact concret si réussi",
-      "vulnerabilities_used": ["titre vuln 1", "titre vuln 2"]
+      "vulnerabilities_used": ["titre vuln 1", "titre vuln 2"],
+      "mitre_techniques": ["T1190 — Exploit Public-Facing Application", "T1059 — Command and Scripting Interpreter"],
+      "mitre_tactics": ["Initial Access", "Execution"]
     }}
   ],
   "top_priorities": [

@@ -134,6 +134,9 @@
     .vuln-cat   { font-size: 8pt; color: #6366f1; margin-top: 2px; }
     .vuln-rem   { font-size: 8.5pt; color: #475569; margin-top: 4px; font-style: italic; }
 
+    /* ─── ATT&CK badges ─── */
+    .attack-tag { display: inline-block; font-size: 7pt; font-weight: 700; padding: 2px 7px; border-radius: 4px; background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; margin: 2px 2px 0 0; }
+
     /* ─── Attack paths ─── */
     .attack-path { border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 16px; overflow: hidden; }
     .attack-path-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
@@ -151,6 +154,7 @@
       flex-shrink: 0; margin-top: 1px;
     }
     .impact-box { background: #fef2f2; border: 1px solid #fca5a5; border-radius: 6px; padding: 8px 12px; margin-top: 10px; font-size: 9pt; color: #7f1d1d; }
+    .mitre-box { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 6px; padding: 8px 12px; margin-top: 10px; font-size: 8.5pt; color: #7c2d12; }
 
     /* ─── Priorities ─── */
     .priority-item { display: flex; gap: 14px; align-items: flex-start; padding: 14px 0; border-bottom: 1px solid #f1f5f9; }
@@ -305,6 +309,13 @@
           {% if v.category %}<div class="vuln-cat">{{ v.category }}</div>{% endif %}
           {% if v.description %}<div class="vuln-rem" style="color:#334155;font-style:normal;">{{ v.description[:120] }}{% if v.description|length > 120 %}…{% endif %}</div>{% endif %}
           {% if v.evidence %}<div class="vuln-rem">{{ v.evidence[:100] }}{% if v.evidence|length > 100 %}…{% endif %}</div>{% endif %}
+          {% if v.attack_techniques %}
+          <div style="margin-top:5px;">
+            {% for tech in v.attack_techniques %}
+            <span class="attack-tag">{{ tech.id }} · {{ tech.tactic }}</span>
+            {% endfor %}
+          </div>
+          {% endif %}
         </td>
         <td><span class="badge {{ v.severity }}">{{ {"critical":"Critique","high":"Élevé","medium":"Moyen","low":"Faible","info":"Info"}.get(v.severity, v.severity) }}</span></td>
         <td style="font-weight:700;color:#1e293b;">{{ "%.1f"|format(v.cvss_score) if v.cvss_score is not none else "—" }}</td>
@@ -345,6 +356,14 @@
       </ul>
       {% if ap.impact %}
       <div class="impact-box"><strong>Impact si réussi :</strong> {{ ap.impact }}</div>
+      {% endif %}
+      {% if ap.mitre_techniques %}
+      <div class="mitre-box">
+        <strong>MITRE ATT&amp;CK :</strong>
+        {% for tech in ap.mitre_techniques %}
+        <span class="attack-tag">{{ tech }}</span>
+        {% endfor %}
+      </div>
       {% endif %}
     </div>
   </div>

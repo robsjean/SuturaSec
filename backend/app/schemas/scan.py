@@ -17,6 +17,7 @@ class VulnerabilityResponse(BaseModel):
     category: Optional[str]
     evidence: Optional[str]
     remediation: Optional[str]
+    attack_techniques: Optional[Any] = None
     discovered_at: datetime
 
     model_config = {"from_attributes": True}
