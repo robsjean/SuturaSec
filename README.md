@@ -5,42 +5,40 @@
 ![Python](https://img.shields.io/badge/Python-3.14-3776AB?style=flat-square&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=flat-square&logo=fastapi&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-3-003B57?style=flat-square&logo=sqlite&logoColor=white)
-![Claude AI](https://img.shields.io/badge/Claude_AI-Powered-CC785C?style=flat-square)
-![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
 
 ---
 
 ## ✨ Fonctionnalités
 
-### 🔍 Scanners de sécurité
+### Scanners de sécurité
 - **Scanner Web** — Analyse automatisée OWASP Top 10 : injections, XSS, mauvaises configurations, headers HTTP, SSL/TLS, cookies, redirections
 - **Scanner Réseau** — Découverte d'hôtes, scan de ports ouverts, détection de services et bannières
 
-### 🤖 Moteur IA (Claude AI)
+### Moteur IA (Claude AI)
 - **Résumé exécutif** auto-généré pour chaque analyse
 - **Modélisation des chemins d'attaque** (MITRE ATT&CK-style)
 - **Priorités de remédiation** classées par effort / impact
 - **Quick Wins** : actions correctives rapides identifiées automatiquement
 
-### 📄 Rapports PDF
+### Rapports PDF
 - Génération en un clic depuis le tableau de bord
 - Format professionnel optimisé pour l'impression
 - 4 sections : synthèse, vulnérabilités, chemins d'attaque, plan de remédiation
 
-### 🎨 Interface moderne
+### Interface moderne
 - **Mode sombre / mode clair** avec persistance localStorage
 - Sidebar de navigation avec roadmap des fonctionnalités à venir
 - Design responsive (mobile & desktop)
 - Mise à jour automatique en temps réel pendant les scans
 
-### 🔐 Authentification & Sécurité
+### Authentification & Sécurité
 - JWT (JSON Web Tokens) avec expiration configurable
 - Hashage bcrypt des mots de passe
 - Isolation des données par utilisateur
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 SuturaSec/
@@ -65,8 +63,8 @@ SuturaSec/
     │       ├── web_scanner.py   # Scanner HTTP/SSL/OWASP
     │       └── network_scanner.py # Scanner réseau/ports
     ├── templates/               # Jinja2 + Alpine.js + Tailwind CSS
-    │   ├── base.html            # Layout public (login/register)
-    │   ├── base_app.html        # Layout app (sidebar + topbar)
+    │   ├── base.html            # Layout public
+    │   ├── base_app.html        # Layout app
     │   ├── login.html
     │   ├── register.html
     │   ├── dashboard.html
@@ -86,12 +84,10 @@ SuturaSec/
 | Frontend | Jinja2, Alpine.js (CDN), Tailwind CSS (CDN) |
 | HTTP client | httpx (scans web + appels API) |
 
-> **Zéro dépendances front** : pas de Node.js, pas de npm, pas de build step.
-> Le frontend est entièrement servi par FastAPI via Jinja2.
 
 ---
 
-## 🚀 Installation & Lancement
+## Installation & Lancement
 
 ### Prérequis
 - Python 3.10+
@@ -144,11 +140,11 @@ ANTHROPIC_API_KEY=sk-ant-api03-...
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Ouvrir [http://localhost:8000](http://localhost:8000) 🎉
+Ouvrir [http://localhost:8000](http://localhost:8000) 
 
 ---
 
-## 📡 API REST
+## API REST
 
 | Méthode | Endpoint | Description |
 |---------|----------|-------------|
@@ -164,39 +160,12 @@ Documentation Swagger interactive : [http://localhost:8000/docs](http://localhos
 
 ---
 
-## 🗺️ Roadmap
-
-- [ ] **OSINT Recon** — Collecte d'informations publiques sur une cible
-- [ ] **API Security Scanner** — Tests automatisés sur les endpoints REST
-- [ ] **Cloud Security** — Audit de configurations AWS / GCP / Azure
-- [ ] **Phishing Simulator** — Campagnes de sensibilisation collaborateurs
-- [ ] **Compliance Score** — Évaluation ISO 27001, RGPD, PCI-DSS
-- [ ] **Threat Intelligence** — Corrélation avec des feeds CTI publics
-- [ ] **Multi-tenant** — Gestion d'équipes et de clients
-
----
-
 ## ⚠️ Avertissement légal
 
 SuturaSec est conçu pour analyser **uniquement des systèmes dont vous êtes propriétaire ou pour lesquels vous disposez d'une autorisation écrite explicite**. Toute utilisation non autorisée est illégale et contraire à l'éthique. Les auteurs déclinent toute responsabilité en cas d'utilisation abusive.
 
 ---
 
-## 👤 Auteur
+## Auteur
 
-**Jean Sarr** — Ingénieur Cybersécurité
-
-- 🔗 [LinkedIn](https://linkedin.com/in/TON_PROFIL)
-- 🐙 [GitHub](https://github.com/TON_USERNAME)
-
----
-
-## 📄 Licence
-
-Ce projet est sous licence [MIT](LICENSE).
-
----
-
-<p align="center">
-  Construit avec ❤️ — Premier projet personnel en cybersécurité
-</p>
+**Jean Robert Waly Sarr** — Ingénieur Cybersécurité
