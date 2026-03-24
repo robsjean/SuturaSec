@@ -32,6 +32,19 @@ class Finding:
 # CVSS indicatifs par sévérité (utilisés quand le check n'en précise pas)
 _DEFAULT_CVSS = {"critical": 9.0, "high": 7.5, "medium": 5.0, "low": 3.1, "info": 0.0}
 
+# User-Agent imitant un navigateur réel pour éviter les blocages anti-bot
+_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/124.0.0.0 Safari/537.36"
+)
+
+_HEADERS = {
+    "User-Agent": _USER_AGENT,
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
+}
+
 
 # ---------------------------------------------------------------------------
 # Scanner principal
@@ -55,6 +68,7 @@ class WebScanner:
         try:
             self._response = httpx.get(
                 self.target,
+                headers=_HEADERS,
                 follow_redirects=True,
                 timeout=self.timeout,
                 verify=False,  # on vérifie SSL séparément pour garder le contrôle
@@ -101,6 +115,7 @@ class WebScanner:
             try:
                 r = httpx.get(
                     self.target.replace("http://", "https://", 1),
+                    headers=_HEADERS,
                     follow_redirects=False,
                     timeout=self.timeout,
                     verify=False,
@@ -396,7 +411,7 @@ class WebScanner:
         for path, severity, category, cvss, description in sensitive:
             url = base + path
             try:
-                r = httpx.get(url, follow_redirects=False, timeout=self.timeout, verify=False)
+                r = httpx.get(url, headers=_HEADERS, follow_redirects=False, timeout=self.timeout, verify=False)
                 if r.status_code == 200:
                     preview = r.text[:200].strip().replace("\n", " ")
                     self.findings.append(Finding(
@@ -419,7 +434,7 @@ class WebScanner:
         dangerous = ["TRACE", "PUT", "DELETE"]
         for method in dangerous:
             try:
-                r = httpx.request(method, self.target, timeout=self.timeout, verify=False)
+                r = httpx.request(method, self.target, headers=_HEADERS, timeout=self.timeout, verify=False)
                 if r.status_code not in (405, 501, 403):
                     self.findings.append(Finding(
                         title=f"Méthode HTTP dangereuse autorisée : {method}",
