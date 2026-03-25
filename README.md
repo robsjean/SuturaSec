@@ -81,7 +81,6 @@ SuturaSec/
 | Base de données | SQLite + SQLAlchemy ORM |
 | Auth | JWT (python-jose) + bcrypt |
 | IA | Anthropic Claude API (httpx direct) |
-| Frontend | Jinja2, Alpine.js (CDN), Tailwind CSS (CDN) |
 | HTTP client | httpx (scans web + appels API) |
 
 
