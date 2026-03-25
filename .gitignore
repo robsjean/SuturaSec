@@ -45,3 +45,6 @@ alembic/versions/
 
 # ===== Node (au cas où) =====
 node_modules/
+
+frontend/
+
