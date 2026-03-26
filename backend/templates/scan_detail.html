@@ -482,7 +482,7 @@ function scanDetailApp(scanId) {
 
     openReport() {
       const token = localStorage.getItem('token');
-      window.open(`/scans/${scanId}/report?token=${token}`, '_blank');
+      window.open(`/scans/${scanId}/report?token=${encodeURIComponent(token)}`, '_blank');
     }
   }
 }

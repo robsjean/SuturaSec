@@ -76,15 +76,22 @@ def page_report(
     # Vérifier le token passé en query param (pour les rapports ouverts dans un nouvel onglet)
     user = None
     if token:
-        try:
-            user_data = decode_token(token)
-            user_id = int(user_data.get("sub"))
-            user = db.query(User).filter(User.id == user_id).first()
-        except Exception:
-            pass
+        user_data = decode_token(token)
+        if user_data is not None:
+            try:
+                user_id = int(user_data.get("sub", 0))
+                if user_id:
+                    user = db.query(User).filter(User.id == user_id).first()
+            except (ValueError, TypeError):
+                pass
 
     if not user:
-        return HTMLResponse("<p>Non autorisé. <a href='/login'>Se connecter</a></p>", status_code=401)
+        return HTMLResponse(
+            "<html><body style='font-family:system-ui;padding:2rem'>"
+            "<p>Session expirée ou token invalide. "
+            "<a href='/login'>Se reconnecter</a></p></body></html>",
+            status_code=401,
+        )
 
     scan = db.query(Scan).filter(Scan.id == scan_id, Scan.user_id == user.id).first()
     if not scan:
