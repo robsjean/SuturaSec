@@ -8,6 +8,12 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./suturasec.db"
     ANTHROPIC_API_KEY: str = ""
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Railway fournit postgresql:// — SQLAlchemy 2.0 requiert postgresql+psycopg2://
+        if self.DATABASE_URL.startswith("postgresql://"):
+            object.__setattr__(self, "DATABASE_URL", self.DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://", 1))
+
     class Config:
         env_file = ".env"
 
