@@ -1,0 +1,221 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 900" font-family="'Segoe UI', system-ui, sans-serif">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f172a"/>
+      <stop offset="100%" style="stop-color:#1e1b4b"/>
+    </linearGradient>
+    <linearGradient id="coreGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4f46e5"/>
+      <stop offset="100%" style="stop-color:#7c3aed"/>
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1400" height="900" fill="url(#bgGrad)"/>
+  <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#ffffff" stroke-width="0.3" opacity="0.05"/>
+  </pattern>
+  <rect width="1400" height="900" fill="url(#grid)"/>
+
+  <!-- Title -->
+  <text x="700" y="46" text-anchor="middle" font-size="26" font-weight="800" fill="#ffffff" letter-spacing="-0.5">SuturaSec — Security as a Service</text>
+  <text x="700" y="68" text-anchor="middle" font-size="12" fill="#94a3b8" letter-spacing="2">ARCHITECTURE · VISION PLATEFORME IDÉALE</text>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- CONNECTOR LINES (drawn before boxes) -->
+  <!-- ═══════════════════════════════════════════ -->
+
+  <!-- Core → Offensive -->
+  <line x1="532" y1="418" x2="332" y2="276" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="6,3" opacity="0.5"/>
+  <!-- Core → Intelligence -->
+  <line x1="600" y1="372" x2="478" y2="246" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="6,3" opacity="0.5"/>
+  <!-- Core → AI -->
+  <line x1="800" y1="372" x2="922" y2="246" stroke="#06b6d4" stroke-width="1.5" stroke-dasharray="6,3" opacity="0.5"/>
+  <!-- Core → Access -->
+  <line x1="868" y1="418" x2="1068" y2="276" stroke="#f97316" stroke-width="1.5" stroke-dasharray="6,3" opacity="0.5"/>
+  <!-- Core → Compliance -->
+  <line x1="532" y1="482" x2="332" y2="622" stroke="#10b981" stroke-width="1.5" stroke-dasharray="6,3" opacity="0.5"/>
+  <!-- Core → Cloud -->
+  <line x1="620" y1="528" x2="478" y2="652" stroke="#8b5cf6" stroke-width="1.5" stroke-dasharray="6,3" opacity="0.5"/>
+  <!-- Core → Reporting -->
+  <line x1="780" y1="528" x2="922" y2="652" stroke="#ec4899" stroke-width="1.5" stroke-dasharray="6,3" opacity="0.5"/>
+  <!-- Core → Incident -->
+  <line x1="868" y1="482" x2="1068" y2="622" stroke="#14b8a6" stroke-width="1.5" stroke-dasharray="6,3" opacity="0.5"/>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- CORE PLATFORM -->
+  <!-- ═══════════════════════════════════════════ -->
+  <rect x="532" y="372" width="336" height="156" rx="20" fill="url(#coreGrad)" filter="url(#shadow)" opacity="0.95"/>
+  <rect x="532" y="372" width="336" height="156" rx="20" fill="none" stroke="#818cf8" stroke-width="2"/>
+  <text x="700" y="408" text-anchor="middle" font-size="22">🛡️</text>
+  <text x="700" y="432" text-anchor="middle" font-size="17" font-weight="800" fill="#ffffff">CORE PLATFORM</text>
+  <line x1="562" y1="442" x2="838" y2="442" stroke="#818cf8" stroke-width="0.8" opacity="0.4"/>
+  <text x="700" y="460" text-anchor="middle" font-size="10.5" fill="#c7d2fe">Auth · Multi-tenant · API Gateway · Dashboard</text>
+  <text x="700" y="477" text-anchor="middle" font-size="10.5" fill="#c7d2fe">Notifications · Billing · Audit Logs</text>
+  <text x="700" y="494" text-anchor="middle" font-size="10.5" fill="#c7d2fe">Role Management · Settings</text>
+  <!-- implemented badge -->
+  <rect x="620" y="505" width="160" height="17" rx="8" fill="#312e81" opacity="0.8"/>
+  <text x="700" y="517" text-anchor="middle" font-size="9" fill="#818cf8" font-weight="700">● PARTIELLEMENT IMPLÉMENTÉ</text>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- MODULE: OFFENSIVE SECURITY (top-left) -->
+  <!-- ═══════════════════════════════════════════ -->
+  <rect x="102" y="168" width="228" height="212" rx="14" fill="#1e293b" filter="url(#shadow)"/>
+  <rect x="102" y="168" width="228" height="212" rx="14" fill="none" stroke="#ef4444" stroke-width="1.5"/>
+  <rect x="102" y="168" width="228" height="40" rx="14" fill="#dc2626"/>
+  <rect x="102" y="188" width="228" height="20" fill="#dc2626"/>
+  <text x="216" y="194" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">⚔️  OFFENSIVE SECURITY</text>
+  <rect x="116" y="200" width="80" height="14" rx="6" fill="#991b1b"/>
+  <text x="156" y="211" text-anchor="middle" font-size="8" font-weight="700" fill="#fca5a5">✓ IMPLÉMENTÉ</text>
+  <text x="118" y="232" font-size="10.5" fill="#fca5a5">▸</text><text x="130" y="232" font-size="10.5" fill="#e2e8f0">Web Scanner (DAST)</text>
+  <text x="118" y="251" font-size="10.5" fill="#fca5a5">▸</text><text x="130" y="251" font-size="10.5" fill="#e2e8f0">Network Scanner</text>
+  <text x="118" y="270" font-size="10.5" fill="#64748b">▸</text><text x="130" y="270" font-size="10.5" fill="#64748b">API Security Testing</text>
+  <text x="118" y="289" font-size="10.5" fill="#64748b">▸</text><text x="130" y="289" font-size="10.5" fill="#64748b">Phishing Simulator</text>
+  <text x="118" y="308" font-size="10.5" fill="#64748b">▸</text><text x="130" y="308" font-size="10.5" fill="#64748b">Fuzzing Engine</text>
+  <text x="118" y="327" font-size="10.5" fill="#64748b">▸</text><text x="130" y="327" font-size="10.5" fill="#64748b">CVE Exploit Checker</text>
+  <text x="118" y="346" font-size="10.5" fill="#64748b">▸</text><text x="130" y="346" font-size="10.5" fill="#64748b">Subdomain Takeover</text>
+  <text x="118" y="365" font-size="10.5" fill="#64748b">▸</text><text x="130" y="365" font-size="10.5" fill="#64748b">Password Spray Test</text>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- MODULE: THREAT INTELLIGENCE (top-center-left) -->
+  <!-- ═══════════════════════════════════════════ -->
+  <rect x="362" y="128" width="228" height="212" rx="14" fill="#1e293b" filter="url(#shadow)"/>
+  <rect x="362" y="128" width="228" height="212" rx="14" fill="none" stroke="#f59e0b" stroke-width="1.5"/>
+  <rect x="362" y="128" width="228" height="40" rx="14" fill="#d97706"/>
+  <rect x="362" y="148" width="228" height="20" fill="#d97706"/>
+  <text x="476" y="154" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">🔍  THREAT INTELLIGENCE</text>
+  <rect x="376" y="160" width="80" height="14" rx="6" fill="#92400e"/>
+  <text x="416" y="171" text-anchor="middle" font-size="8" font-weight="700" fill="#fcd34d">✓ MITRE IMPLÉMENTÉ</text>
+  <text x="378" y="192" font-size="10.5" fill="#fcd34d">▸</text><text x="390" y="192" font-size="10.5" fill="#e2e8f0">MITRE ATT&amp;CK Mapping</text>
+  <text x="378" y="211" font-size="10.5" fill="#fcd34d">▸</text><text x="390" y="211" font-size="10.5" fill="#e2e8f0">CVE Feed (NVD/CVSS)</text>
+  <text x="378" y="230" font-size="10.5" fill="#64748b">▸</text><text x="390" y="230" font-size="10.5" fill="#64748b">OSINT Engine</text>
+  <text x="378" y="249" font-size="10.5" fill="#64748b">▸</text><text x="390" y="249" font-size="10.5" fill="#64748b">Dark Web Monitoring</text>
+  <text x="378" y="268" font-size="10.5" fill="#64748b">▸</text><text x="390" y="268" font-size="10.5" fill="#64748b">IoC Tracker</text>
+  <text x="378" y="287" font-size="10.5" fill="#64748b">▸</text><text x="390" y="287" font-size="10.5" fill="#64748b">Threat Actor Profiles</text>
+  <text x="378" y="306" font-size="10.5" fill="#64748b">▸</text><text x="390" y="306" font-size="10.5" fill="#64748b">Breach Detection</text>
+  <text x="378" y="325" font-size="10.5" fill="#64748b">▸</text><text x="390" y="325" font-size="10.5" fill="#64748b">Threat Feeds Live</text>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- MODULE: AI ENGINE (top-center-right) -->
+  <!-- ═══════════════════════════════════════════ -->
+  <rect x="810" y="128" width="228" height="212" rx="14" fill="#1e293b" filter="url(#shadow)"/>
+  <rect x="810" y="128" width="228" height="212" rx="14" fill="none" stroke="#06b6d4" stroke-width="1.5"/>
+  <rect x="810" y="128" width="228" height="40" rx="14" fill="#0891b2"/>
+  <rect x="810" y="148" width="228" height="20" fill="#0891b2"/>
+  <text x="924" y="154" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">🤖  AI ENGINE (CLAUDE)</text>
+  <rect x="824" y="160" width="80" height="14" rx="6" fill="#164e63"/>
+  <text x="864" y="171" text-anchor="middle" font-size="8" font-weight="700" fill="#67e8f9">✓ IMPLÉMENTÉ</text>
+  <text x="826" y="192" font-size="10.5" fill="#67e8f9">▸</text><text x="838" y="192" font-size="10.5" fill="#e2e8f0">Threat Modeling</text>
+  <text x="826" y="211" font-size="10.5" fill="#67e8f9">▸</text><text x="838" y="211" font-size="10.5" fill="#e2e8f0">Attack Path Generation</text>
+  <text x="826" y="230" font-size="10.5" fill="#67e8f9">▸</text><text x="838" y="230" font-size="10.5" fill="#e2e8f0">AI Risk Scoring</text>
+  <text x="826" y="249" font-size="10.5" fill="#67e8f9">▸</text><text x="838" y="249" font-size="10.5" fill="#e2e8f0">Remediation Advisor</text>
+  <text x="826" y="268" font-size="10.5" fill="#64748b">▸</text><text x="838" y="268" font-size="10.5" fill="#64748b">Natural Language Query</text>
+  <text x="826" y="287" font-size="10.5" fill="#64748b">▸</text><text x="838" y="287" font-size="10.5" fill="#64748b">Anomaly Detection</text>
+  <text x="826" y="306" font-size="10.5" fill="#64748b">▸</text><text x="838" y="306" font-size="10.5" fill="#64748b">Auto-Triage</text>
+  <text x="826" y="325" font-size="10.5" fill="#64748b">▸</text><text x="838" y="325" font-size="10.5" fill="#64748b">Executive Summary Gen.</text>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- MODULE: ACCESS CONTROL (top-right) -->
+  <!-- ═══════════════════════════════════════════ -->
+  <rect x="1070" y="168" width="228" height="212" rx="14" fill="#1e293b" filter="url(#shadow)"/>
+  <rect x="1070" y="168" width="228" height="212" rx="14" fill="none" stroke="#f97316" stroke-width="1.5"/>
+  <rect x="1070" y="168" width="228" height="40" rx="14" fill="#ea580c"/>
+  <rect x="1070" y="188" width="228" height="20" fill="#ea580c"/>
+  <text x="1184" y="194" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">🔐  ACCESS CONTROL</text>
+  <text x="1086" y="232" font-size="10.5" fill="#fdba74">▸</text><text x="1098" y="232" font-size="10.5" fill="#e2e8f0">Multi-tenant SaaS</text>
+  <text x="1086" y="251" font-size="10.5" fill="#fdba74">▸</text><text x="1098" y="251" font-size="10.5" fill="#e2e8f0">RBAC (Admin / Analyst)</text>
+  <text x="1086" y="270" font-size="10.5" fill="#64748b">▸</text><text x="1098" y="270" font-size="10.5" fill="#64748b">SSO / SAML / OIDC</text>
+  <text x="1086" y="289" font-size="10.5" fill="#64748b">▸</text><text x="1098" y="289" font-size="10.5" fill="#64748b">MFA Enforcement</text>
+  <text x="1086" y="308" font-size="10.5" fill="#64748b">▸</text><text x="1098" y="308" font-size="10.5" fill="#64748b">API Key Management</text>
+  <text x="1086" y="327" font-size="10.5" fill="#64748b">▸</text><text x="1098" y="327" font-size="10.5" fill="#64748b">Team Collaboration</text>
+  <text x="1086" y="346" font-size="10.5" fill="#64748b">▸</text><text x="1098" y="346" font-size="10.5" fill="#64748b">Permission Scoping</text>
+  <text x="1086" y="365" font-size="10.5" fill="#64748b">▸</text><text x="1098" y="365" font-size="10.5" fill="#64748b">Org Management</text>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- MODULE: COMPLIANCE (bottom-left) -->
+  <!-- ═══════════════════════════════════════════ -->
+  <rect x="102" y="528" width="228" height="212" rx="14" fill="#1e293b" filter="url(#shadow)"/>
+  <rect x="102" y="528" width="228" height="212" rx="14" fill="none" stroke="#10b981" stroke-width="1.5"/>
+  <rect x="102" y="528" width="228" height="40" rx="14" fill="#059669"/>
+  <rect x="102" y="548" width="228" height="20" fill="#059669"/>
+  <text x="216" y="554" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">✅  COMPLIANCE</text>
+  <text x="118" y="588" font-size="10.5" fill="#6ee7b7">▸</text><text x="130" y="588" font-size="10.5" fill="#64748b">ISO 27001 Checker</text>
+  <text x="118" y="607" font-size="10.5" fill="#6ee7b7">▸</text><text x="130" y="607" font-size="10.5" fill="#64748b">SOC 2 Readiness</text>
+  <text x="118" y="626" font-size="10.5" fill="#6ee7b7">▸</text><text x="130" y="626" font-size="10.5" fill="#64748b">GDPR Assessment</text>
+  <text x="118" y="645" font-size="10.5" fill="#6ee7b7">▸</text><text x="130" y="645" font-size="10.5" fill="#64748b">PCI-DSS Audit</text>
+  <text x="118" y="664" font-size="10.5" fill="#6ee7b7">▸</text><text x="130" y="664" font-size="10.5" fill="#64748b">Compliance Score</text>
+  <text x="118" y="683" font-size="10.5" fill="#6ee7b7">▸</text><text x="130" y="683" font-size="10.5" fill="#64748b">Policy Generator (AI)</text>
+  <text x="118" y="702" font-size="10.5" fill="#6ee7b7">▸</text><text x="130" y="702" font-size="10.5" fill="#64748b">Audit Trail</text>
+  <text x="118" y="721" font-size="10.5" fill="#6ee7b7">▸</text><text x="130" y="721" font-size="10.5" fill="#64748b">Risk Register</text>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- MODULE: CLOUD SECURITY (bottom-center-left) -->
+  <!-- ═══════════════════════════════════════════ -->
+  <rect x="362" y="562" width="228" height="212" rx="14" fill="#1e293b" filter="url(#shadow)"/>
+  <rect x="362" y="562" width="228" height="212" rx="14" fill="none" stroke="#8b5cf6" stroke-width="1.5"/>
+  <rect x="362" y="562" width="228" height="40" rx="14" fill="#7c3aed"/>
+  <rect x="362" y="582" width="228" height="20" fill="#7c3aed"/>
+  <text x="476" y="588" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">☁️  CLOUD SECURITY</text>
+  <text x="378" y="622" font-size="10.5" fill="#c4b5fd">▸</text><text x="390" y="622" font-size="10.5" fill="#64748b">AWS / Azure / GCP Audit</text>
+  <text x="378" y="641" font-size="10.5" fill="#c4b5fd">▸</text><text x="390" y="641" font-size="10.5" fill="#64748b">IAM Review</text>
+  <text x="378" y="660" font-size="10.5" fill="#c4b5fd">▸</text><text x="390" y="660" font-size="10.5" fill="#64748b">Container / Docker Security</text>
+  <text x="378" y="679" font-size="10.5" fill="#c4b5fd">▸</text><text x="390" y="679" font-size="10.5" fill="#64748b">K8s Hardening Check</text>
+  <text x="378" y="698" font-size="10.5" fill="#c4b5fd">▸</text><text x="390" y="698" font-size="10.5" fill="#64748b">Misconfiguration Scan</text>
+  <text x="378" y="717" font-size="10.5" fill="#c4b5fd">▸</text><text x="390" y="717" font-size="10.5" fill="#64748b">S3 / Blob Exposure</text>
+  <text x="378" y="736" font-size="10.5" fill="#c4b5fd">▸</text><text x="390" y="736" font-size="10.5" fill="#64748b">Serverless Security</text>
+  <text x="378" y="755" font-size="10.5" fill="#c4b5fd">▸</text><text x="390" y="755" font-size="10.5" fill="#64748b">Drift Detection</text>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- MODULE: REPORTING (bottom-center-right) -->
+  <!-- ═══════════════════════════════════════════ -->
+  <rect x="810" y="562" width="228" height="212" rx="14" fill="#1e293b" filter="url(#shadow)"/>
+  <rect x="810" y="562" width="228" height="212" rx="14" fill="none" stroke="#ec4899" stroke-width="1.5"/>
+  <rect x="810" y="562" width="228" height="40" rx="14" fill="#be185d"/>
+  <rect x="810" y="582" width="228" height="20" fill="#be185d"/>
+  <text x="924" y="588" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">📊  REPORTING</text>
+  <rect x="824" y="594" width="80" height="14" rx="6" fill="#831843"/>
+  <text x="864" y="605" text-anchor="middle" font-size="8" font-weight="700" fill="#f9a8d4">✓ IMPLÉMENTÉ</text>
+  <text x="826" y="626" font-size="10.5" fill="#f9a8d4">▸</text><text x="838" y="626" font-size="10.5" fill="#e2e8f0">PDF Reports</text>
+  <text x="826" y="645" font-size="10.5" fill="#f9a8d4">▸</text><text x="838" y="645" font-size="10.5" fill="#e2e8f0">Live Dashboard</text>
+  <text x="826" y="664" font-size="10.5" fill="#64748b">▸</text><text x="838" y="664" font-size="10.5" fill="#64748b">API / Webhook Export</text>
+  <text x="826" y="683" font-size="10.5" fill="#64748b">▸</text><text x="838" y="683" font-size="10.5" fill="#64748b">Scheduled Scans</text>
+  <text x="826" y="702" font-size="10.5" fill="#64748b">▸</text><text x="838" y="702" font-size="10.5" fill="#64748b">Trend Analytics</text>
+  <text x="826" y="721" font-size="10.5" fill="#64748b">▸</text><text x="838" y="721" font-size="10.5" fill="#64748b">JIRA / Slack Integration</text>
+  <text x="826" y="740" font-size="10.5" fill="#64748b">▸</text><text x="838" y="740" font-size="10.5" fill="#64748b">Custom Report Builder</text>
+  <text x="826" y="759" font-size="10.5" fill="#64748b">▸</text><text x="838" y="759" font-size="10.5" fill="#64748b">White-label Reports</text>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- MODULE: INCIDENT RESPONSE (bottom-right) -->
+  <!-- ═══════════════════════════════════════════ -->
+  <rect x="1070" y="528" width="228" height="212" rx="14" fill="#1e293b" filter="url(#shadow)"/>
+  <rect x="1070" y="528" width="228" height="212" rx="14" fill="none" stroke="#14b8a6" stroke-width="1.5"/>
+  <rect x="1070" y="528" width="228" height="40" rx="14" fill="#0f766e"/>
+  <rect x="1070" y="548" width="228" height="20" fill="#0f766e"/>
+  <text x="1184" y="554" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">🚨  INCIDENT RESPONSE</text>
+  <text x="1086" y="588" font-size="10.5" fill="#5eead4">▸</text><text x="1098" y="588" font-size="10.5" fill="#64748b">Real-time Alerting</text>
+  <text x="1086" y="607" font-size="10.5" fill="#5eead4">▸</text><text x="1098" y="607" font-size="10.5" fill="#64748b">Playbook Automation</text>
+  <text x="1086" y="626" font-size="10.5" fill="#5eead4">▸</text><text x="1098" y="626" font-size="10.5" fill="#64748b">Auto Ticket (JIRA)</text>
+  <text x="1086" y="645" font-size="10.5" fill="#5eead4">▸</text><text x="1098" y="645" font-size="10.5" fill="#64748b">SIEM Integration</text>
+  <text x="1086" y="664" font-size="10.5" fill="#5eead4">▸</text><text x="1098" y="664" font-size="10.5" fill="#64748b">Forensic Timeline</text>
+  <text x="1086" y="683" font-size="10.5" fill="#5eead4">▸</text><text x="1098" y="683" font-size="10.5" fill="#64748b">Slack / Email Notify</text>
+  <text x="1086" y="702" font-size="10.5" fill="#5eead4">▸</text><text x="1098" y="702" font-size="10.5" fill="#64748b">SLA Tracking</text>
+  <text x="1086" y="721" font-size="10.5" fill="#5eead4">▸</text><text x="1098" y="721" font-size="10.5" fill="#64748b">Post-incident Report</text>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- LEGEND -->
+  <!-- ═══════════════════════════════════════════ -->
+  <rect x="102" y="856" width="1196" height="1" fill="#334155"/>
+
+  <rect x="102" y="870" width="12" height="12" rx="3" fill="#4f46e5"/>
+  <text x="120" y="881" font-size="10.5" fill="#94a3b8">Implémenté</text>
+
+  <rect x="200" y="870" width="12" height="12" rx="3" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+  <text x="218" y="881" font-size="10.5" fill="#94a3b8">À venir (roadmap)</text>
+
+  <text x="700" y="881" text-anchor="middle" font-size="10.5" fill="#475569">github.com/robsjean/SuturaSec · Security as a Service · Jean Sarr · 2025</text>
+
+  <text x="1298" y="881" text-anchor="end" font-size="10.5" fill="#475569">v1.0 — 2025</text>
+</svg>
