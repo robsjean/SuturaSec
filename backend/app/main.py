@@ -75,6 +75,8 @@ def page_report(
 
     # Vérifier le token passé en query param (pour les rapports ouverts dans un nouvel onglet)
     user = None
+    error_msg = "Token manquant."
+
     if token:
         user_data = decode_token(token)
         if user_data is not None:
@@ -82,14 +84,24 @@ def page_report(
                 user_id = int(user_data.get("sub", 0))
                 if user_id:
                     user = db.query(User).filter(User.id == user_id).first()
-            except (ValueError, TypeError):
-                pass
+                    if not user:
+                        error_msg = "Utilisateur introuvable."
+                else:
+                    error_msg = "Token invalide (sub manquant)."
+            except (ValueError, TypeError) as e:
+                error_msg = f"Erreur de parsing du token : {e}"
+        else:
+            error_msg = "Token expiré ou invalide. Reconnectez-vous et réessayez."
+
+    print(f"[Report] scan_id={scan_id} token={'présent' if token else 'absent'} user={user}")
 
     if not user:
         return HTMLResponse(
-            "<html><body style='font-family:system-ui;padding:2rem'>"
-            "<p>Session expirée ou token invalide. "
-            "<a href='/login'>Se reconnecter</a></p></body></html>",
+            f"<html><body style='font-family:system-ui;padding:2rem;max-width:500px;margin:auto'>"
+            f"<h2 style='color:#dc2626'>Accès refusé</h2>"
+            f"<p style='color:#334155'>{error_msg}</p>"
+            f"<a href='/login' style='color:#4f46e5'>Se reconnecter</a>"
+            f"</body></html>",
             status_code=401,
         )
 
