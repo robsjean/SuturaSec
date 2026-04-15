@@ -44,24 +44,31 @@
             <div class="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
                  :class="scan.scan_type === 'web'
                    ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-500 dark:text-blue-400'
-                   : 'bg-purple-50 dark:bg-purple-900/20 text-purple-500 dark:text-purple-400'">
+                   : scan.scan_type === 'cti'
+                     ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500 dark:text-emerald-400'
+                     : 'bg-purple-50 dark:bg-purple-900/20 text-purple-500 dark:text-purple-400'">
               <template x-if="scan.scan_type === 'web'">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
                   <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
                 </svg>
               </template>
-              <template x-if="scan.scan_type !== 'web'">
+              <template x-if="scan.scan_type === 'network'">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/>
                   <line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
+                </svg>
+              </template>
+              <template x-if="scan.scan_type === 'cti'">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
                 </svg>
               </template>
             </div>
             <div>
               <h2 class="text-lg font-bold text-gray-900 dark:text-white break-all" x-text="scan.target"></h2>
               <p class="text-sm text-gray-500 mt-0.5">
-                <span x-text="scan.scan_type === 'web' ? 'Analyse Web' : 'Analyse Réseau'"></span>
+                <span x-text="scan.scan_type === 'web' ? 'Analyse Web' : scan.scan_type === 'cti' ? 'Threat Intelligence' : 'Analyse Réseau'"></span>
                 · <span x-text="new Date(scan.created_at).toLocaleDateString('fr-FR', { day:'2-digit', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' })"></span>
               </p>
             </div>
@@ -383,6 +390,238 @@
           </div>
         </div>
 
+        <!-- ===== TAB: THREAT INTEL (CTI) ===== -->
+        <div x-show="activeTab === 'threat_intel'" x-cloak class="mt-4 space-y-4">
+
+          <!-- Threat Score Banner -->
+          <template x-if="scan.threat_intel">
+            <div>
+              <!-- Score + niveau -->
+              <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm mb-4">
+                <div class="flex items-center justify-between flex-wrap gap-4">
+                  <div>
+                    <p class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Score de menace global</p>
+                    <div class="flex items-end gap-2">
+                      <span class="text-5xl font-bold"
+                            :class="{
+                              'text-red-500': scan.threat_intel.threat_score >= 8,
+                              'text-orange-500': scan.threat_intel.threat_score >= 6 && scan.threat_intel.threat_score < 8,
+                              'text-amber-500': scan.threat_intel.threat_score >= 3 && scan.threat_intel.threat_score < 6,
+                              'text-green-500': scan.threat_intel.threat_score < 3
+                            }"
+                            x-text="scan.threat_intel.threat_score.toFixed(1)"></span>
+                      <span class="text-gray-400 text-lg mb-1">/10</span>
+                    </div>
+                  </div>
+                  <div class="flex flex-col items-end gap-2">
+                    <span class="px-3 py-1.5 rounded-xl text-sm font-bold uppercase tracking-wide"
+                          :class="{
+                            'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400': scan.threat_intel.risk_level === 'critical',
+                            'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400': scan.threat_intel.risk_level === 'high',
+                            'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400': scan.threat_intel.risk_level === 'medium',
+                            'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400': scan.threat_intel.risk_level === 'low',
+                            'bg-gray-100 dark:bg-gray-800 text-gray-500': scan.threat_intel.risk_level === 'info'
+                          }"
+                          x-text="({critical:'Critique', high:'Élevé', medium:'Moyen', low:'Faible', info:'Info'})[scan.threat_intel.risk_level] || scan.threat_intel.risk_level"></span>
+                    <p class="text-xs text-gray-500 font-mono" x-text="'IP : ' + (scan.threat_intel.ip || '—')"></p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Grid : Géolocalisation + Domaine -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+
+                <!-- Géolocalisation -->
+                <div x-show="scan.threat_intel.geolocation?.country"
+                     class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
+                  <div class="flex items-center gap-2 mb-4">
+                    <div class="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                      </svg>
+                    </div>
+                    <p class="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Géolocalisation</p>
+                  </div>
+                  <dl class="space-y-2 text-sm">
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-gray-500">Pays</dt>
+                      <dd class="font-medium text-gray-900 dark:text-white text-right" x-text="scan.threat_intel.geolocation.country + ' (' + scan.threat_intel.geolocation.country_code + ')'"></dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-gray-500">Ville</dt>
+                      <dd class="font-medium text-gray-900 dark:text-white text-right" x-text="(scan.threat_intel.geolocation.city || '—') + ', ' + (scan.threat_intel.geolocation.region || '')"></dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-gray-500">ISP / Org</dt>
+                      <dd class="font-medium text-gray-900 dark:text-white text-right truncate max-w-xs" x-text="scan.threat_intel.geolocation.org || scan.threat_intel.geolocation.isp || '—'"></dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-gray-500">ASN</dt>
+                      <dd class="font-mono text-xs text-gray-700 dark:text-gray-300 text-right" x-text="scan.threat_intel.geolocation.asn || '—'"></dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-gray-500">Fuseau horaire</dt>
+                      <dd class="font-medium text-gray-900 dark:text-white text-right" x-text="scan.threat_intel.geolocation.timezone || '—'"></dd>
+                    </div>
+                    <div class="flex justify-between gap-2" x-show="scan.threat_intel.geolocation.is_hosting">
+                      <dt class="text-gray-500">Type</dt>
+                      <dd><span class="px-2 py-0.5 rounded-lg text-xs font-semibold bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400">Datacenter / Hosting</span></dd>
+                    </div>
+                  </dl>
+                </div>
+
+                <!-- Infos domaine (RDAP) -->
+                <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
+                  <div class="flex items-center gap-2 mb-4">
+                    <div class="w-7 h-7 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                      </svg>
+                    </div>
+                    <p class="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Informations Domaine</p>
+                  </div>
+                  <dl class="space-y-2 text-sm">
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-gray-500">Domaine</dt>
+                      <dd class="font-mono text-gray-900 dark:text-white" x-text="scan.threat_intel.domain"></dd>
+                    </div>
+                    <div class="flex justify-between gap-2" x-show="scan.threat_intel.domain_info?.registrar">
+                      <dt class="text-gray-500">Registrar</dt>
+                      <dd class="font-medium text-gray-900 dark:text-white text-right truncate max-w-xs" x-text="scan.threat_intel.domain_info?.registrar"></dd>
+                    </div>
+                    <div class="flex justify-between gap-2" x-show="scan.threat_intel.domain_info?.creation_date">
+                      <dt class="text-gray-500">Créé le</dt>
+                      <dd class="font-medium text-gray-900 dark:text-white" x-text="scan.threat_intel.domain_info?.creation_date"></dd>
+                    </div>
+                    <div class="flex justify-between gap-2" x-show="scan.threat_intel.domain_info?.expiry_date">
+                      <dt class="text-gray-500">Expiration</dt>
+                      <dd class="font-medium text-gray-900 dark:text-white" x-text="scan.threat_intel.domain_info?.expiry_date"></dd>
+                    </div>
+                    <div class="flex justify-between gap-2" x-show="scan.threat_intel.domain_info?.age_days !== undefined">
+                      <dt class="text-gray-500">Ancienneté</dt>
+                      <dd>
+                        <span class="font-medium" x-text="scan.threat_intel.domain_info?.age_days + ' jours'"
+                              :class="scan.threat_intel.domain_info?.age_days < 30 ? 'text-red-500' : scan.threat_intel.domain_info?.age_days < 180 ? 'text-amber-500' : 'text-green-500'"></span>
+                      </dd>
+                    </div>
+                    <div class="flex justify-between gap-2" x-show="scan.threat_intel.domain_info?.status?.length">
+                      <dt class="text-gray-500">Statut</dt>
+                      <dd class="font-medium text-gray-900 dark:text-white text-right" x-text="scan.threat_intel.domain_info?.status?.join(', ')"></dd>
+                    </div>
+                  </dl>
+                </div>
+              </div>
+
+              <!-- DNS Records -->
+              <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm mb-4">
+                <div class="flex items-center gap-2 mb-4">
+                  <div class="w-7 h-7 rounded-lg bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" stroke-width="2">
+                      <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+                    </svg>
+                  </div>
+                  <p class="text-xs font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wider">Enregistrements DNS</p>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <template x-for="[type, records] in Object.entries(scan.threat_intel.dns_records || {})" :key="type">
+                    <div class="rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700/50 p-3">
+                      <p class="text-xs font-bold text-gray-500 dark:text-gray-400 mb-2 uppercase" x-text="type"></p>
+                      <template x-for="(rec, i) in records" :key="i">
+                        <p class="font-mono text-xs text-gray-700 dark:text-gray-300 truncate" x-text="rec"></p>
+                      </template>
+                    </div>
+                  </template>
+                  <div x-show="!Object.keys(scan.threat_intel.dns_records || {}).length"
+                       class="col-span-2 text-sm text-gray-400 italic">
+                    Aucun enregistrement DNS récupéré.
+                  </div>
+                </div>
+              </div>
+
+              <!-- Blacklists DNSBL -->
+              <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm mb-4">
+                <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+                  <div class="flex items-center gap-2">
+                    <div class="w-7 h-7 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                        <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                      </svg>
+                    </div>
+                    <p class="text-xs font-bold text-red-600 dark:text-red-400 uppercase tracking-wider">Blacklists DNSBL</p>
+                  </div>
+                  <div class="flex items-center gap-2 text-sm">
+                    <span class="text-gray-500" x-text="scan.threat_intel.blacklists?.checked + ' listes vérifiées'"></span>
+                    <span class="font-bold px-2 py-0.5 rounded-lg text-xs"
+                          :class="scan.threat_intel.blacklists?.listed > 0
+                            ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+                            : 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'"
+                          x-text="scan.threat_intel.blacklists?.listed + ' présence(s)'"></span>
+                  </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <template x-for="hit in scan.threat_intel.blacklists?.hits || []" :key="hit.name">
+                    <div class="flex items-center justify-between px-3 py-2 rounded-xl border"
+                         :class="hit.listed
+                           ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                           : 'bg-gray-50 dark:bg-gray-800/50 border-gray-100 dark:border-gray-700/50'">
+                      <span class="text-xs font-medium text-gray-700 dark:text-gray-300" x-text="hit.name"></span>
+                      <span class="text-xs font-bold px-2 py-0.5 rounded-full"
+                            :class="hit.listed
+                              ? 'bg-red-500 text-white'
+                              : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'"
+                            x-text="hit.listed ? 'LISTÉ' : 'OK'"></span>
+                    </div>
+                  </template>
+                </div>
+              </div>
+
+              <!-- AbuseIPDB (si disponible) -->
+              <div x-show="scan.threat_intel.abuse?.confidence_score !== undefined"
+                   class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
+                <div class="flex items-center gap-2 mb-4">
+                  <div class="w-7 h-7 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2">
+                      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                  </div>
+                  <p class="text-xs font-bold text-orange-600 dark:text-orange-400 uppercase tracking-wider">AbuseIPDB</p>
+                </div>
+                <dl class="space-y-2 text-sm">
+                  <div class="flex justify-between">
+                    <dt class="text-gray-500">Score d'abus</dt>
+                    <dd class="font-bold"
+                        :class="scan.threat_intel.abuse.confidence_score >= 80 ? 'text-red-500' : scan.threat_intel.abuse.confidence_score >= 50 ? 'text-orange-500' : 'text-green-500'"
+                        x-text="scan.threat_intel.abuse.confidence_score + '%'"></dd>
+                  </div>
+                  <div class="flex justify-between">
+                    <dt class="text-gray-500">Signalements</dt>
+                    <dd class="font-medium text-gray-900 dark:text-white" x-text="scan.threat_intel.abuse.total_reports"></dd>
+                  </div>
+                  <div class="flex justify-between" x-show="scan.threat_intel.abuse.last_reported">
+                    <dt class="text-gray-500">Dernier rapport</dt>
+                    <dd class="font-medium text-gray-900 dark:text-white" x-text="scan.threat_intel.abuse.last_reported"></dd>
+                  </div>
+                  <div class="flex justify-between" x-show="scan.threat_intel.abuse.usage_type">
+                    <dt class="text-gray-500">Type d'utilisation</dt>
+                    <dd class="font-medium text-gray-900 dark:text-white" x-text="scan.threat_intel.abuse.usage_type"></dd>
+                  </div>
+                  <div class="flex justify-between" x-show="scan.threat_intel.abuse.is_tor">
+                    <dt class="text-gray-500">Nœud Tor</dt>
+                    <dd><span class="px-2 py-0.5 rounded-lg text-xs font-semibold bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">Oui</span></dd>
+                  </div>
+                </dl>
+              </div>
+            </div>
+          </template>
+
+          <div x-show="!scan.threat_intel"
+               class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-12 text-center text-gray-500 shadow-sm">
+            Données Threat Intelligence non disponibles.
+          </div>
+        </div>
+
         <!-- ===== TAB: REMÉDIATION ===== -->
         <div x-show="activeTab === 'remediation'" class="mt-4">
           <div x-show="!scan.attack_paths?.top_priorities?.length" x-cloak
@@ -446,12 +685,18 @@ function scanDetailApp(scanId) {
     activeTab: 'overview',
 
     get tabs() {
-      return [
+      const base = [
         { key: 'overview',    label: 'Aperçu',          count: null },
         { key: 'vulns',       label: 'Vulnérabilités',  count: this.scan?.vulnerabilities?.length ?? 0 },
-        { key: 'attacks',     label: 'Chemins d\'attaque', count: this.scan?.attack_paths?.attack_paths?.length ?? 0 },
-        { key: 'remediation', label: 'Remédiation',     count: this.scan?.attack_paths?.top_priorities?.length ?? 0 },
       ];
+      if (this.scan?.scan_type === 'cti') {
+        base.push({ key: 'threat_intel', label: 'Threat Intel', count: null });
+      }
+      base.push(
+        { key: 'attacks',     label: 'Chemins d\'attaque', count: this.scan?.attack_paths?.attack_paths?.length ?? 0 },
+        { key: 'remediation', label: 'Remédiation',         count: this.scan?.attack_paths?.top_priorities?.length ?? 0 },
+      );
+      return base;
     },
 
     async init() {

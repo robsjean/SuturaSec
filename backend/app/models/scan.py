@@ -15,6 +15,7 @@ class Scan(Base):
     risk_score = Column(Float, nullable=True)
     summary = Column(Text, nullable=True)
     attack_paths = Column(JSON, nullable=True)
+    threat_intel = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     completed_at = Column(DateTime, nullable=True)
 

@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480  # 8 heures
     DATABASE_URL: str = "sqlite:///./suturasec.db"
     ANTHROPIC_API_KEY: str = ""
+    ABUSEIPDB_API_KEY: str = ""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

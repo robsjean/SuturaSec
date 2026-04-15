@@ -38,9 +38,19 @@ def _run_scan(scan_id: int, db_url: str):
         if scan.scan_type == "web":
             scanner = WebScanner(scan.target)
             findings = scanner.run()
-        else:
+        elif scan.scan_type == "network":
             scanner = NetworkScanner(scan.target)
             findings = scanner.run()
+        else:
+            # CTI scan
+            from app.scanners.cti_scanner import CTIScanner
+            from app.config import settings as cfg
+            cti = CTIScanner(
+                scan.target,
+                abuseipdb_key=cfg.ABUSEIPDB_API_KEY,
+            )
+            findings, threat_intel = cti.run()
+            scan.threat_intel = threat_intel
 
         vulns = [
             Vulnerability(
@@ -96,7 +106,7 @@ def create_scan(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if scan_data.scan_type not in ("web", "network"):
+    if scan_data.scan_type not in ("web", "network", "cti"):
         raise HTTPException(status_code=400, detail="scan_type doit être 'web' ou 'network'")
 
     scan = Scan(

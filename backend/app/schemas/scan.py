@@ -31,6 +31,7 @@ class ScanResponse(BaseModel):
     risk_score: Optional[float]
     summary: Optional[str]
     attack_paths: Optional[Any]
+    threat_intel: Optional[Any] = None
     created_at: datetime
     completed_at: Optional[datetime]
     vulnerabilities: List[VulnerabilityResponse] = []
