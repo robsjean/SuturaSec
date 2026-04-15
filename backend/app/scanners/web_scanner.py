@@ -1,15 +1,18 @@
 """
 Phase 2 — Web Scanner
 Checks : HTTP Security Headers, SSL/TLS, Information Disclosure,
-         Cookie Security, CORS, Sensitive Files, HTTP Methods.
+         Cookie Security, CORS, Sensitive Files, HTTP Methods,
+         SQL Injection, XSS Reflection, Technology Fingerprinting,
+         Open Redirect, Rate Limiting.
 """
 
+import re
 import ssl
 import socket
 import datetime
 from dataclasses import dataclass, field
 from typing import List, Optional
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlencode, urljoin, parse_qs, urlunparse
 
 import httpx
 
@@ -44,6 +47,28 @@ _HEADERS = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
 }
+
+# Patterns d'erreurs SQL par technologie
+_SQL_ERROR_PATTERNS = [
+    r"SQL syntax.*MySQL",
+    r"Warning.*mysql_",
+    r"MySQLSyntaxErrorException",
+    r"valid MySQL result",
+    r"check the manual that (corresponds to|pertains to) your MySQL server version",
+    r"ORA-[0-9]{4,5}",           # Oracle
+    r"Microsoft OLE DB Provider for SQL Server",
+    r"Unclosed quotation mark",   # MSSQL
+    r"quoted string not properly terminated",  # Oracle
+    r"pg_query\(\).*:.*ERROR",   # PostgreSQL
+    r"ERROR:\s+syntax error at or near",
+    r"PSQLException",
+    r"SQLiteException",
+    r"sqlite3\.OperationalError",
+    r"SQLITE_ERROR",
+    r"com\.microsoft\.sqlserver",
+    r"Syntax error or access violation",
+    r"SQLSTATE\[",
+]
 
 
 # ---------------------------------------------------------------------------
@@ -102,6 +127,11 @@ class WebScanner:
         self._check_cors()
         self._check_sensitive_files()
         self._check_http_methods()
+        self._check_technology_fingerprinting()
+        self._check_sql_injection()
+        self._check_xss_reflection()
+        self._check_open_redirect()
+        self._check_rate_limiting()
 
         return self.findings
 
@@ -111,7 +141,6 @@ class WebScanner:
 
     def _check_https_enforcement(self):
         if self.parsed.scheme == "http":
-            # Tenter une redirection HTTPS auto
             try:
                 r = httpx.get(
                     self.target.replace("http://", "https://", 1),
@@ -200,7 +229,7 @@ class WebScanner:
                 cvss_score=7.5,
             ))
         except Exception:
-            pass  # Hôte sans SSL ou inaccessible sur 443 — déjà couvert par HTTPS enforcement
+            pass
 
     # ------------------------------------------------------------------
     # 3. En-têtes de sécurité HTTP
@@ -292,8 +321,6 @@ class WebScanner:
         for hdr in ("server", "x-powered-by", "x-aspnet-version", "x-aspnetmvc-version"):
             if hdr in headers:
                 val = headers[hdr]
-                # Alerte seulement si la valeur révèle une version
-                import re
                 if re.search(r"[\d.]", val):
                     self.findings.append(Finding(
                         title=f"Version du logiciel exposée ({hdr})",
@@ -396,16 +423,46 @@ class WebScanner:
         base = f"{self.parsed.scheme}://{self.parsed.netloc}"
 
         sensitive = [
-            ("/.env",                "critical", "A02 – Cryptographic Failures",  9.8, "Fichier .env exposé — contient potentiellement des secrets, clés API et credentials."),
+            # Secrets & configs
+            ("/.env",                "critical", "A02 – Cryptographic Failures",    9.8, "Fichier .env exposé — contient potentiellement des secrets, clés API et credentials."),
+            ("/.env.local",          "critical", "A02 – Cryptographic Failures",    9.8, "Fichier .env.local exposé."),
+            ("/.env.production",     "critical", "A02 – Cryptographic Failures",    9.8, "Fichier .env.production exposé."),
             ("/.git/HEAD",           "high",     "A05 – Security Misconfiguration", 7.5, "Dépôt Git accessible publiquement — code source récupérable."),
             ("/.git/config",         "high",     "A05 – Security Misconfiguration", 7.5, "Configuration Git exposée."),
+            ("/config.php",          "critical", "A02 – Cryptographic Failures",    9.1, "Fichier de configuration PHP exposé — credentials DB possibles."),
+            ("/configuration.php",   "critical", "A02 – Cryptographic Failures",    9.1, "Fichier de configuration Joomla! exposé."),
+            ("/wp-config.php.bak",   "critical", "A02 – Cryptographic Failures",    9.1, "Sauvegarde de la config WordPress exposée."),
+            ("/database.yml",        "critical", "A02 – Cryptographic Failures",    9.1, "Fichier database.yml Rails exposé — credentials DB possibles."),
+            ("/settings.py",         "high",     "A02 – Cryptographic Failures",    7.5, "Fichier settings.py Django exposé."),
+            # Sauvegardes
             ("/backup.zip",          "high",     "A05 – Security Misconfiguration", 7.5, "Archive de sauvegarde accessible publiquement."),
             ("/backup.sql",          "high",     "A05 – Security Misconfiguration", 7.5, "Dump SQL accessible publiquement."),
+            ("/dump.sql",            "high",     "A05 – Security Misconfiguration", 7.5, "Dump SQL accessible publiquement."),
+            ("/db.sql",              "high",     "A05 – Security Misconfiguration", 7.5, "Dump de base de données accessible."),
+            # Debug & info
             ("/phpinfo.php",         "medium",   "A05 – Security Misconfiguration", 5.3, "phpinfo() exposé — révèle la configuration serveur."),
-            ("/wp-config.php.bak",   "critical", "A02 – Cryptographic Failures",   9.1, "Sauvegarde de la config WordPress exposée."),
-            ("/admin",               "info",     "A05 – Security Misconfiguration", None, "Interface d'administration accessible (vérifier authentification)."),
+            ("/info.php",            "medium",   "A05 – Security Misconfiguration", 5.3, "phpinfo() exposé."),
             ("/server-status",       "medium",   "A05 – Security Misconfiguration", 5.3, "mod_status Apache accessible — révèle les connexions actives."),
+            ("/server-info",         "medium",   "A05 – Security Misconfiguration", 5.3, "mod_info Apache accessible — révèle les modules chargés."),
+            # Auth
             ("/.htpasswd",           "critical", "A07 – Identification Failures",   9.1, "Fichier .htpasswd exposé — hashes de mots de passe récupérables."),
+            # API & docs
+            ("/api/v1",              "info",     "A05 – Security Misconfiguration", None, "Endpoint API v1 accessible — vérifier l'authentification."),
+            ("/api/v2",              "info",     "A05 – Security Misconfiguration", None, "Endpoint API v2 accessible."),
+            ("/swagger.json",        "medium",   "A05 – Security Misconfiguration", 5.3, "Documentation Swagger/OpenAPI exposée — révèle tous les endpoints."),
+            ("/swagger-ui.html",     "medium",   "A05 – Security Misconfiguration", 5.3, "Interface Swagger UI accessible publiquement."),
+            ("/openapi.json",        "medium",   "A05 – Security Misconfiguration", 5.3, "Schéma OpenAPI exposé publiquement."),
+            ("/api-docs",            "medium",   "A05 – Security Misconfiguration", 5.3, "Documentation API accessible publiquement."),
+            # Panels admin CMS
+            ("/admin",               "info",     "A05 – Security Misconfiguration", None, "Interface d'administration accessible (vérifier authentification)."),
+            ("/wp-admin",            "info",     "A04 – Insecure Design",           None, "Panel admin WordPress détecté."),
+            ("/wp-login.php",        "info",     "A04 – Insecure Design",           None, "Page de login WordPress exposée."),
+            ("/administrator",       "info",     "A04 – Insecure Design",           None, "Panel admin Joomla! détecté."),
+            ("/phpmyadmin",          "high",     "A05 – Security Misconfiguration", 7.5, "phpMyAdmin accessible publiquement — interface de gestion BDD."),
+            ("/adminer.php",         "high",     "A05 – Security Misconfiguration", 7.5, "Adminer (gestion BDD) accessible publiquement."),
+            # Logs
+            ("/logs/error.log",      "high",     "A05 – Security Misconfiguration", 7.5, "Fichier de log accessible — peut contenir des stack traces et données sensibles."),
+            ("/error.log",           "high",     "A05 – Security Misconfiguration", 7.5, "Fichier error.log accessible publiquement."),
         ]
 
         for path, severity, category, cvss, description in sensitive:
@@ -415,7 +472,7 @@ class WebScanner:
                 if r.status_code == 200:
                     preview = r.text[:200].strip().replace("\n", " ")
                     self.findings.append(Finding(
-                        title=f"Fichier sensible accessible : {path}",
+                        title=f"Fichier/ressource sensible accessible : {path}",
                         severity=severity,
                         category=category,
                         description=description,
@@ -447,6 +504,300 @@ class WebScanner:
                     ))
             except Exception:
                 pass
+
+    # ------------------------------------------------------------------
+    # 9. Technology Fingerprinting
+    # ------------------------------------------------------------------
+
+    def _check_technology_fingerprinting(self):
+        if not self._response:
+            return
+
+        body = self._response.text.lower()
+        headers = {k.lower(): v for k, v in self._response.headers.items()}
+        base = f"{self.parsed.scheme}://{self.parsed.netloc}"
+
+        # Detect CMS / Framework
+        fingerprints = [
+            # WordPress
+            (r"wp-content|wp-includes|wordpress", "WordPress détecté", "WordPress est un CMS très ciblé. Maintenez-le à jour et utilisez un WAF.",
+             "/wp-json/wp/v2/users"),  # users endpoint often leaks usernames
+            # Joomla
+            (r'content="joomla|/components/com_', "Joomla! détecté", "Maintenez Joomla! et ses extensions à jour.",
+             None),
+            # Drupal
+            (r'drupal|sites/default/files', "Drupal détecté", "Maintenez Drupal et ses modules à jour.",
+             None),
+            # Laravel
+            (r'laravel_session|laravel|app/Http', "Framework Laravel détecté", "Vérifiez APP_DEBUG=false en production.",
+             None),
+            # Django
+            (r'csrfmiddlewaretoken|django', "Framework Django détecté", "Vérifiez DEBUG=False en production.",
+             None),
+            # React / Next.js
+            (r'__next|_next/static|react', "Application React/Next.js détectée", "Vérifiez que les source maps ne sont pas exposées en production.",
+             None),
+            # Angular
+            (r'ng-version|angular\.min\.js', "Application Angular détectée", "Vérifiez que les source maps ne sont pas exposées.",
+             None),
+            # Vue.js
+            (r'vue\.min\.js|__vue_', "Application Vue.js détectée", "Vérifiez que les source maps ne sont pas exposées.",
+             None),
+        ]
+
+        detected = []
+        for pattern, tech_name, advice, extra_url in fingerprints:
+            if re.search(pattern, body):
+                detected.append((tech_name, advice, extra_url))
+
+        # Check Server header for technology hints
+        server = headers.get("server", "")
+        x_powered = headers.get("x-powered-by", "")
+
+        for val, label in [(server, "Server"), (x_powered, "X-Powered-By")]:
+            if val:
+                tech_hints = {
+                    "apache": ("Apache HTTP Server", "Maintenez Apache à jour. Désactivez les modules inutiles."),
+                    "nginx": ("Nginx", "Maintenez Nginx à jour. Vérifiez la configuration."),
+                    "iis": ("Microsoft IIS", "Appliquez les patches Windows/IIS régulièrement."),
+                    "php": ("PHP", "Maintenez PHP à jour. Désactivez expose_php."),
+                    "asp.net": ("ASP.NET", "Maintenez .NET Framework à jour."),
+                    "tomcat": ("Apache Tomcat", "Maintenez Tomcat à jour. Restreignez l'accès à /manager."),
+                    "express": ("Node.js/Express", "Cachez le header X-Powered-By. Maintenez les dépendances npm à jour."),
+                }
+                for key, (name, advice) in tech_hints.items():
+                    if key in val.lower():
+                        detected.append((f"{name} détecté via {label}", advice, None))
+
+        for tech_name, advice, extra_url in detected:
+            evidence = f"Technologie identifiée dans la réponse HTTP de {self.target}"
+
+            # WordPress: check user enumeration endpoint
+            wp_enum_evidence = ""
+            if extra_url:
+                try:
+                    r2 = httpx.get(base + extra_url, headers=_HEADERS, timeout=self.timeout, verify=False)
+                    if r2.status_code == 200 and "slug" in r2.text:
+                        wp_enum_evidence = f"\n⚠️ Enumération utilisateurs possible via {extra_url} → {r2.status_code}"
+                        evidence += wp_enum_evidence
+                except Exception:
+                    pass
+
+            self.findings.append(Finding(
+                title=f"Technologie identifiée : {tech_name}",
+                severity="info",
+                category="A05 – Security Misconfiguration",
+                description=f"La technologie utilisée a été identifiée, permettant de cibler des CVE spécifiques. {advice}",
+                evidence=evidence,
+                remediation=advice,
+                cvss_score=None,
+            ))
+
+        # WordPress user enumeration (elevated severity)
+        if any("WordPress" in t[0] for t in detected):
+            try:
+                r2 = httpx.get(f"{base}/wp-json/wp/v2/users", headers=_HEADERS, timeout=self.timeout, verify=False)
+                if r2.status_code == 200 and "slug" in r2.text:
+                    import json as _json
+                    users_data = _json.loads(r2.text)
+                    usernames = [u.get("slug", "") for u in users_data[:5] if isinstance(u, dict)]
+                    self.findings.append(Finding(
+                        title="WordPress : énumération des utilisateurs possible",
+                        severity="medium",
+                        category="A07 – Identification Failures",
+                        description="L'API REST WordPress expose les noms d'utilisateurs, facilitant les attaques par dictionnaire.",
+                        evidence=f"GET {base}/wp-json/wp/v2/users → 200 OK\nUtilisateurs : {', '.join(usernames)}",
+                        remediation="Désactiver l'endpoint /wp-json/wp/v2/users ou restreindre l'accès via un plugin de sécurité (Wordfence, etc.).",
+                        cvss_score=5.3,
+                    ))
+            except Exception:
+                pass
+
+    # ------------------------------------------------------------------
+    # 10. SQL Injection (détection basique — erreurs SQL réfléchies)
+    # ------------------------------------------------------------------
+
+    def _check_sql_injection(self):
+        """
+        Injecte des payloads SQLi dans les paramètres GET existants ou des
+        paramètres tests communs. Détecte les erreurs SQL reflétées dans la réponse.
+        """
+        if not self._response:
+            return
+
+        base_url = f"{self.parsed.scheme}://{self.parsed.netloc}{self.parsed.path}"
+        existing_params = parse_qs(self.parsed.query)
+
+        # Paramètres à tester : ceux déjà dans l'URL + paramètres courants
+        test_params = list(existing_params.keys()) or ["id", "page", "q", "search", "cat", "item", "product", "user"]
+
+        sqli_payloads = ["'", "''", "`", "\"", "1' OR '1'='1", "1; SELECT 1--", "' OR 1=1--"]
+
+        already_reported = False
+
+        for param in test_params[:3]:  # Limiter le nombre de requêtes
+            for payload in sqli_payloads[:3]:
+                if already_reported:
+                    break
+                try:
+                    test_url = f"{base_url}?{param}={payload}"
+                    r = httpx.get(test_url, headers=_HEADERS, timeout=self.timeout, verify=False)
+                    body = r.text
+
+                    for pattern in _SQL_ERROR_PATTERNS:
+                        if re.search(pattern, body, re.IGNORECASE):
+                            self.findings.append(Finding(
+                                title="Injection SQL potentielle détectée",
+                                severity="critical",
+                                category="A03 – Injection",
+                                description=(
+                                    "Une erreur SQL a été reflétée dans la réponse HTTP suite à l'injection d'un payload. "
+                                    "Cela indique une vulnérabilité d'injection SQL pouvant permettre l'accès ou la destruction de la base de données."
+                                ),
+                                evidence=f"Payload : {payload!r}\nURL : {test_url}\nErreur SQL détectée (pattern: {pattern})",
+                                remediation=(
+                                    "Utiliser des requêtes préparées (Prepared Statements) ou un ORM. "
+                                    "Ne jamais concaténer directement les entrées utilisateur dans les requêtes SQL."
+                                ),
+                                cvss_score=9.8,
+                            ))
+                            already_reported = True
+                            break
+                except Exception:
+                    pass
+
+    # ------------------------------------------------------------------
+    # 11. XSS Réfléchi (détection basique)
+    # ------------------------------------------------------------------
+
+    def _check_xss_reflection(self):
+        """
+        Teste la réflexion de payloads XSS dans les paramètres GET.
+        Détecte uniquement le XSS réfléchi non encodé (pas DOM-based).
+        """
+        if not self._response:
+            return
+
+        base_url = f"{self.parsed.scheme}://{self.parsed.netloc}{self.parsed.path}"
+        existing_params = parse_qs(self.parsed.query)
+        test_params = list(existing_params.keys()) or ["q", "search", "query", "name", "s", "keyword", "input"]
+
+        xss_marker = "suturasec_xss_probe_7f3a"
+        xss_payload = f'"><script>{xss_marker}</script>'
+
+        already_reported = False
+
+        for param in test_params[:3]:
+            if already_reported:
+                break
+            try:
+                test_url = f"{base_url}?{param}={xss_payload}"
+                r = httpx.get(test_url, headers=_HEADERS, timeout=self.timeout, verify=False)
+
+                # Vérifier si le payload est reflété non encodé
+                if xss_marker in r.text and "<script>" in r.text:
+                    self.findings.append(Finding(
+                        title="XSS Réfléchi potentiel détecté",
+                        severity="high",
+                        category="A03 – Injection",
+                        description=(
+                            "Un payload XSS a été réfléchi dans la réponse HTTP sans être encodé. "
+                            "Cela indique une vulnérabilité Cross-Site Scripting pouvant permettre "
+                            "l'exécution de code JavaScript arbitraire dans le navigateur des victimes."
+                        ),
+                        evidence=f"Paramètre : {param}\nPayload : {xss_payload}\nURL : {test_url}",
+                        remediation=(
+                            "Encoder toutes les sorties HTML (htmlspecialchars en PHP, escape en Python/Jinja2). "
+                            "Implémenter une politique CSP stricte. Valider et assainir toutes les entrées."
+                        ),
+                        cvss_score=8.2,
+                    ))
+                    already_reported = True
+            except Exception:
+                pass
+
+    # ------------------------------------------------------------------
+    # 12. Open Redirect
+    # ------------------------------------------------------------------
+
+    def _check_open_redirect(self):
+        """
+        Teste les paramètres de redirection courants pour détecter les open redirects.
+        """
+        base_url = f"{self.parsed.scheme}://{self.parsed.netloc}{self.parsed.path}"
+        redirect_params = ["redirect", "url", "next", "return", "returnTo", "continue",
+                           "goto", "dest", "destination", "redir", "redirect_uri", "callback"]
+        evil_url = "https://evil.example.com/phishing"
+
+        for param in redirect_params:
+            try:
+                test_url = f"{base_url}?{param}={evil_url}"
+                r = httpx.get(test_url, headers=_HEADERS, follow_redirects=False,
+                              timeout=self.timeout, verify=False)
+
+                # Redirection vers notre URL malveillante ?
+                location = r.headers.get("location", "")
+                if r.status_code in (301, 302, 307, 308) and "evil.example.com" in location:
+                    self.findings.append(Finding(
+                        title="Open Redirect détecté",
+                        severity="medium",
+                        category="A01 – Broken Access Control",
+                        description=(
+                            f"Le paramètre '{param}' permet de rediriger vers une URL arbitraire. "
+                            "Cela peut être exploité pour des campagnes de phishing en utilisant le domaine légitime comme intermédiaire."
+                        ),
+                        evidence=f"GET {test_url}\n→ HTTP {r.status_code} Location: {location}",
+                        remediation=(
+                            "Valider les URLs de redirection via une liste blanche. "
+                            "Ne jamais rediriger vers une URL fournie directement par l'utilisateur sans validation."
+                        ),
+                        cvss_score=6.1,
+                    ))
+                    break  # Un seul finding suffisant
+            except Exception:
+                pass
+
+    # ------------------------------------------------------------------
+    # 13. Rate Limiting
+    # ------------------------------------------------------------------
+
+    def _check_rate_limiting(self):
+        """
+        Envoie 10 requêtes rapides et vérifie si le serveur applique un rate limiting.
+        """
+        import time
+
+        responses = []
+        try:
+            for _ in range(10):
+                r = httpx.get(self.target, headers=_HEADERS, timeout=self.timeout, verify=False)
+                responses.append(r.status_code)
+        except Exception:
+            return
+
+        # Si aucun 429/503 n'a été reçu, le rate limiting est absent
+        rate_limited = any(code in (429, 503) for code in responses)
+        has_header_protection = self._response and (
+            "x-ratelimit-limit" in {k.lower() for k in self._response.headers}
+            or "retry-after" in {k.lower() for k in self._response.headers}
+        )
+
+        if not rate_limited and not has_header_protection:
+            self.findings.append(Finding(
+                title="Absence de rate limiting détectée",
+                severity="medium",
+                category="A05 – Security Misconfiguration",
+                description=(
+                    "Le serveur n'applique pas de rate limiting visible (aucun HTTP 429 reçu après 10 requêtes rapides, "
+                    "aucun header X-RateLimit-Limit). Cela expose le site aux attaques par force brute et DoS applicatif."
+                ),
+                evidence=f"10 requêtes envoyées → statuts : {responses}. Aucun 429 reçu.",
+                remediation=(
+                    "Implémenter un rate limiting (ex : nginx limit_req, fail2ban, Cloudflare, "
+                    "ou middleware Express/FastAPI rate-limiter). Retourner HTTP 429 avec Retry-After."
+                ),
+                cvss_score=5.3,
+            ))
 
 
 # ---------------------------------------------------------------------------
