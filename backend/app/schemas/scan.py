@@ -49,5 +49,11 @@ class ScanListResponse(BaseModel):
     created_at: datetime
     completed_at: Optional[datetime]
     vuln_count: int = 0
+    critical_count: int = 0
+    high_count: int = 0
+    medium_count: int = 0
+    low_count: int = 0
+    compliance_score: Optional[float] = None
+    compliance_grade: Optional[str] = None
 
     model_config = {"from_attributes": True}

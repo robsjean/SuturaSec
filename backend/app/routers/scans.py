@@ -135,6 +135,8 @@ def list_scans(db: Session = Depends(get_db), current_user: User = Depends(get_c
     scans = db.query(Scan).filter(Scan.user_id == current_user.id).order_by(Scan.created_at.desc()).all()
     result = []
     for scan in scans:
+        vulns = scan.vulnerabilities
+        cr = scan.compliance_reports or {}
         item = ScanListResponse(
             id=scan.id,
             target=scan.target,
@@ -143,7 +145,13 @@ def list_scans(db: Session = Depends(get_db), current_user: User = Depends(get_c
             risk_score=scan.risk_score,
             created_at=scan.created_at,
             completed_at=scan.completed_at,
-            vuln_count=len(scan.vulnerabilities),
+            vuln_count=len(vulns),
+            critical_count=sum(1 for v in vulns if v.severity == "critical"),
+            high_count=sum(1 for v in vulns if v.severity == "high"),
+            medium_count=sum(1 for v in vulns if v.severity == "medium"),
+            low_count=sum(1 for v in vulns if v.severity == "low"),
+            compliance_score=cr.get("global_score"),
+            compliance_grade=cr.get("global_grade"),
         )
         result.append(item)
     return result

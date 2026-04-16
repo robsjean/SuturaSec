@@ -20,7 +20,7 @@
 <div x-data="dashboardApp()" x-init="init()">
 
   <!-- ===== STATS GRID ===== -->
-  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
 
     <!-- Total -->
     <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
@@ -67,20 +67,116 @@
       <p class="text-xs text-gray-400 mt-1">complétés</p>
     </div>
 
-    <!-- Vulns -->
+    <!-- Critiques -->
     <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
       <div class="flex items-center justify-between mb-3">
-        <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Vulnérabilités</p>
-        <div class="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center text-amber-500 dark:text-amber-400">
+        <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Critiques</p>
+        <div class="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-900/20 flex items-center justify-center text-red-500 dark:text-red-400">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
             <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
           </svg>
         </div>
       </div>
-      <p class="text-3xl font-bold text-amber-600 dark:text-amber-400"
-         x-text="scans.reduce((a, s) => a + (s.vuln_count || 0), 0)"></p>
-      <p class="text-xs text-gray-400 mt-1">détectées</p>
+      <p class="text-3xl font-bold text-red-600 dark:text-red-400"
+         x-text="scans.reduce((a, s) => a + (s.critical_count || 0), 0)"></p>
+      <p class="text-xs text-gray-400 mt-1">vulnérabilités critiques</p>
+    </div>
+  </div>
+
+  <!-- ===== CHARTS ROW ===== -->
+  <div x-show="completedScans.length > 0" x-cloak class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
+
+    <!-- Bar chart : Scores de risque -->
+    <div class="lg:col-span-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <p class="text-sm font-semibold text-gray-900 dark:text-white">Scores de risque</p>
+          <p class="text-xs text-gray-500 mt-0.5">Derniers scans complétés</p>
+        </div>
+        <div class="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2">
+            <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
+            <line x1="6" y1="20" x2="6" y2="14"/>
+          </svg>
+        </div>
+      </div>
+      <div class="relative h-48">
+        <canvas id="riskChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Donut : Répartition sévérités -->
+    <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <p class="text-sm font-semibold text-gray-900 dark:text-white">Vulnérabilités</p>
+          <p class="text-xs text-gray-500 mt-0.5">Par sévérité</p>
+        </div>
+        <div class="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/>
+          </svg>
+        </div>
+      </div>
+      <div class="relative h-36 flex items-center justify-center">
+        <canvas id="sevChart"></canvas>
+      </div>
+      <!-- Legend -->
+      <div class="grid grid-cols-2 gap-1.5 mt-3">
+        <template x-for="[label, color, key] in [
+          ['Critique','bg-red-500','critical_count'],
+          ['Élevé','bg-orange-500','high_count'],
+          ['Moyen','bg-amber-500','medium_count'],
+          ['Faible','bg-blue-400','low_count']
+        ]" :key="label">
+          <div class="flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full flex-shrink-0" :class="color"></span>
+            <span class="text-xs text-gray-500 dark:text-gray-400" x-text="label + ': ' + scans.reduce((a,s)=>a+(s[key]||0),0)"></span>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== COMPLIANCE MINI-SCORES ===== -->
+  <div x-show="complianceScans.length > 0" x-cloak
+       class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm mb-5">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <p class="text-sm font-semibold text-gray-900 dark:text-white">Conformité — dernier scan</p>
+        <p class="text-xs text-gray-500 mt-0.5" x-text="'Cible : ' + (complianceScans[0]?.target || '—')"></p>
+      </div>
+      <span class="text-lg font-black px-3 py-1 rounded-xl"
+            :class="{
+              'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400': ['A+','A'].includes(complianceScans[0]?.compliance_grade),
+              'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400': complianceScans[0]?.compliance_grade === 'B',
+              'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400': complianceScans[0]?.compliance_grade === 'C',
+              'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400': ['D','F'].includes(complianceScans[0]?.compliance_grade)
+            }"
+            x-text="(complianceScans[0]?.compliance_grade || '—') + '  ' + (complianceScans[0]?.compliance_score?.toFixed(0) || '—') + '/100'">
+      </span>
+    </div>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <template x-for="[label, color] in [['OWASP','indigo'],['PCI-DSS','violet'],['ISO 27001','cyan'],['RGPD','emerald']]" :key="label">
+        <div class="space-y-1.5">
+          <div class="flex justify-between items-center">
+            <span class="text-xs font-semibold text-gray-500 dark:text-gray-400" x-text="label"></span>
+            <span class="text-xs font-bold text-gray-700 dark:text-gray-300"
+                  x-text="(getFrameworkScore(label) || '—') + (getFrameworkScore(label) !== null ? '/100' : '')"></span>
+          </div>
+          <div class="w-full h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+            <div class="h-full rounded-full transition-all duration-500"
+                 :style="`width: ${getFrameworkScore(label) || 0}%`"
+                 :class="{
+                   'bg-green-500': getFrameworkScore(label) >= 80,
+                   'bg-amber-500': getFrameworkScore(label) >= 60 && getFrameworkScore(label) < 80,
+                   'bg-orange-500': getFrameworkScore(label) >= 40 && getFrameworkScore(label) < 60,
+                   'bg-red-500': getFrameworkScore(label) < 40 && getFrameworkScore(label) !== null
+                 }"></div>
+          </div>
+        </div>
+      </template>
     </div>
   </div>
 
@@ -339,6 +435,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script>
 function dashboardApp() {
   return {
@@ -347,14 +444,31 @@ function dashboardApp() {
     newScan: { target: '', scan_type: 'web' },
     submitting: false,
     _interval: null,
+    _riskChart: null,
+    _sevChart: null,
+    _complianceData: null,  // cache from last scan with compliance
 
+    /* ── Computed ── */
+    get completedScans() {
+      return this.scans.filter(s => s.status === 'completed');
+    },
+    get complianceScans() {
+      return this.scans.filter(s => s.compliance_score != null).slice(0, 1);
+    },
+
+    getFrameworkScore(label) {
+      if (!this._complianceData) return null;
+      const map = { 'OWASP': 'OWASP Top 10', 'PCI-DSS': 'PCI-DSS', 'ISO 27001': 'ISO 27001', 'RGPD': 'GDPR' };
+      const fw = this._complianceData.find(f => f.framework === map[label]);
+      return fw ? fw.overall_score : null;
+    },
+
+    /* ── Lifecycle ── */
     async init() {
-      // Listen for sidebar "Scanner Web/Réseau" click
       window.addEventListener('open-new-scan', (e) => {
         this.newScan.scan_type = e.detail?.type || 'web';
         this.showForm = true;
       });
-      // Handle URL param ?scan=web|network
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get('scan')) {
         this.newScan.scan_type = urlParams.get('scan');
@@ -363,17 +477,175 @@ function dashboardApp() {
       }
       await this.fetchScans();
       this._interval = setInterval(() => this.fetchScans(), 5000);
+
+      // Re-render charts when theme changes
+      window.addEventListener('ss-theme-changed', () => {
+        this.$nextTick(() => this.renderCharts());
+      });
     },
 
     async fetchScans() {
       try {
         const res = await apiFetch('/scans');
-        if (res.ok) this.scans = await res.json();
+        if (res.ok) {
+          this.scans = await res.json();
+          // Load compliance detail for latest compliant scan
+          const withCompliance = this.scans.find(s => s.compliance_score != null);
+          if (withCompliance) {
+            this._loadComplianceDetail(withCompliance.id);
+          }
+          this.$nextTick(() => this.renderCharts());
+        }
       } finally {
         this.loading = false;
       }
     },
 
+    async _loadComplianceDetail(scanId) {
+      try {
+        const res = await apiFetch('/scans/' + scanId);
+        if (res.ok) {
+          const data = await res.json();
+          this._complianceData = data.compliance_reports?.frameworks || null;
+        }
+      } catch {}
+    },
+
+    /* ── Charts ── */
+    renderCharts() {
+      const completed = this.completedScans;
+      if (!completed.length) return;
+      const isDark = document.documentElement.classList.contains('dark');
+      const textColor  = isDark ? '#9ca3af' : '#6b7280';
+      const gridColor  = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+      const bgCard     = isDark ? '#111827' : '#ffffff';
+
+      Chart.defaults.font.family = 'ui-sans-serif, system-ui, -apple-system, sans-serif';
+      Chart.defaults.font.size   = 11;
+      Chart.defaults.color       = textColor;
+
+      /* ── Bar chart : Scores de risque ── */
+      const riskScans = completed
+        .filter(s => s.scan_type !== 'cti' && s.risk_score != null)
+        .slice(0, 10)
+        .reverse();
+
+      const riskLabels = riskScans.map(s => {
+        const t = s.target.replace(/^https?:\/\//, '');
+        return t.length > 18 ? t.slice(0, 16) + '…' : t;
+      });
+      const riskData  = riskScans.map(s => s.risk_score);
+      const riskColors = riskData.map(v =>
+        v >= 7 ? '#ef4444' : v >= 4 ? '#f59e0b' : '#22c55e'
+      );
+
+      if (this._riskChart) this._riskChart.destroy();
+      const riskCtx = document.getElementById('riskChart');
+      if (riskCtx && riskData.length) {
+        this._riskChart = new Chart(riskCtx, {
+          type: 'bar',
+          data: {
+            labels: riskLabels,
+            datasets: [{
+              data: riskData,
+              backgroundColor: riskColors.map(c => c + '33'),
+              borderColor: riskColors,
+              borderWidth: 2,
+              borderRadius: 6,
+              borderSkipped: false,
+            }]
+          },
+          options: {
+            animation: false,
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: bgCard,
+                titleColor: isDark ? '#f9fafb' : '#111827',
+                bodyColor: textColor,
+                borderColor: gridColor,
+                borderWidth: 1,
+                padding: 10,
+                callbacks: {
+                  label: ctx => ` Score de risque : ${ctx.raw.toFixed(1)} / 10`,
+                }
+              }
+            },
+            scales: {
+              x: {
+                grid: { display: false },
+                border: { display: false },
+                ticks: { color: textColor, maxRotation: 35 }
+              },
+              y: {
+                min: 0, max: 10,
+                grid: { color: gridColor },
+                border: { display: false },
+                ticks: { color: textColor, stepSize: 2 }
+              }
+            }
+          }
+        });
+      }
+
+      /* ── Donut : Sévérités ── */
+      const totals = ['critical_count','high_count','medium_count','low_count']
+        .map(k => completed.reduce((a, s) => a + (s[k] || 0), 0));
+      const totalVulns = totals.reduce((a, b) => a + b, 0);
+
+      if (this._sevChart) this._sevChart.destroy();
+      const sevCtx = document.getElementById('sevChart');
+      if (sevCtx && totalVulns > 0) {
+        this._sevChart = new Chart(sevCtx, {
+          type: 'doughnut',
+          data: {
+            labels: ['Critique', 'Élevé', 'Moyen', 'Faible'],
+            datasets: [{
+              data: totals,
+              backgroundColor: ['#ef4444', '#f97316', '#f59e0b', '#60a5fa'],
+              borderWidth: 0,
+              hoverOffset: 4,
+            }]
+          },
+          options: {
+            animation: false,
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '72%',
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: bgCard,
+                titleColor: isDark ? '#f9fafb' : '#111827',
+                bodyColor: textColor,
+                borderColor: gridColor,
+                borderWidth: 1,
+                padding: 10,
+                callbacks: {
+                  label: ctx => ` ${ctx.label} : ${ctx.raw} (${((ctx.raw/totalVulns)*100).toFixed(0)}%)`
+                }
+              }
+            }
+          }
+        });
+      } else if (sevCtx && totalVulns === 0) {
+        // All clear
+        this._sevChart = new Chart(sevCtx, {
+          type: 'doughnut',
+          data: {
+            datasets: [{ data: [1], backgroundColor: ['#22c55e'], borderWidth: 0 }]
+          },
+          options: {
+            animation: false, responsive: true, maintainAspectRatio: false,
+            cutout: '72%', plugins: { legend: { display: false }, tooltip: { enabled: false } }
+          }
+        });
+      }
+    },
+
+    /* ── CRUD ── */
     async createScan() {
       this.formError = ''; this.submitting = true;
       try {
@@ -398,6 +670,7 @@ function dashboardApp() {
       if (!confirm('Supprimer ce scan ? Cette action est irréversible.')) return;
       await apiFetch('/scans/' + id, { method: 'DELETE' });
       this.scans = this.scans.filter(s => s.id !== id);
+      this.$nextTick(() => this.renderCharts());
     }
   }
 }
