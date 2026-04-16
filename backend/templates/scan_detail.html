@@ -622,6 +622,240 @@
           </div>
         </div>
 
+        <!-- ===== TAB: CONFORMITÉ ===== -->
+        <div x-show="activeTab === 'compliance'" x-cloak class="mt-4 space-y-5">
+          <template x-if="scan.compliance_reports">
+
+            <!-- Score global -->
+            <div>
+              <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm mb-4">
+                <div class="flex items-center justify-between flex-wrap gap-4 mb-4">
+                  <div>
+                    <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Score de conformité global</p>
+                    <div class="flex items-end gap-2">
+                      <span class="text-5xl font-bold"
+                            :class="{
+                              'text-green-500': scan.compliance_reports.global_score >= 80,
+                              'text-amber-500': scan.compliance_reports.global_score >= 60 && scan.compliance_reports.global_score < 80,
+                              'text-orange-500': scan.compliance_reports.global_score >= 40 && scan.compliance_reports.global_score < 60,
+                              'text-red-500': scan.compliance_reports.global_score < 40
+                            }"
+                            x-text="scan.compliance_reports.global_score.toFixed(0)"></span>
+                      <span class="text-gray-400 text-lg mb-1">/100</span>
+                    </div>
+                  </div>
+                  <div class="flex flex-col items-end gap-2">
+                    <span class="text-4xl font-black"
+                          :class="{
+                            'text-green-500': ['A+','A'].includes(scan.compliance_reports.global_grade),
+                            'text-amber-500': scan.compliance_reports.global_grade === 'B',
+                            'text-orange-500': scan.compliance_reports.global_grade === 'C',
+                            'text-red-500': ['D','F'].includes(scan.compliance_reports.global_grade)
+                          }"
+                          x-text="scan.compliance_reports.global_grade"></span>
+                    <p class="text-xs text-gray-500" x-text="scan.compliance_reports.summary"></p>
+                  </div>
+                </div>
+
+                <!-- Mini scores par framework -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <template x-for="fw in scan.compliance_reports.frameworks" :key="fw.framework">
+                    <div class="rounded-xl p-3 border text-center"
+                         :class="{
+                           'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800': fw.overall_score >= 80,
+                           'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800': fw.overall_score >= 60 && fw.overall_score < 80,
+                           'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800': fw.overall_score >= 40 && fw.overall_score < 60,
+                           'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800': fw.overall_score < 40
+                         }">
+                      <p class="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1" x-text="fw.framework + ' ' + fw.version"></p>
+                      <p class="text-2xl font-black"
+                         :class="{
+                           'text-green-600 dark:text-green-400': fw.overall_score >= 80,
+                           'text-amber-600 dark:text-amber-400': fw.overall_score >= 60 && fw.overall_score < 80,
+                           'text-orange-600 dark:text-orange-400': fw.overall_score >= 40 && fw.overall_score < 60,
+                           'text-red-600 dark:text-red-400': fw.overall_score < 40
+                         }"
+                         x-text="fw.grade"></p>
+                      <p class="text-xs text-gray-500 mt-0.5" x-text="fw.overall_score.toFixed(0) + '/100'"></p>
+                      <p class="text-xs mt-1">
+                        <span class="text-green-600 font-medium" x-text="fw.passed + ' ✓'"></span>
+                        <span class="text-gray-400 mx-0.5">/</span>
+                        <span class="text-red-500 font-medium" x-text="fw.failed + ' ✗'"></span>
+                        <span x-show="fw.partial > 0" class="text-amber-500 font-medium" x-text="' / ' + fw.partial + ' ~'"></span>
+                      </p>
+                    </div>
+                  </template>
+                </div>
+              </div>
+
+              <!-- Détail par framework -->
+              <template x-for="fw in scan.compliance_reports.frameworks" :key="fw.framework">
+                <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm overflow-hidden mb-4">
+
+                  <!-- Framework header -->
+                  <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800">
+                    <div class="flex items-center gap-3">
+                      <div class="w-8 h-8 rounded-lg flex items-center justify-center"
+                           :class="{
+                             'bg-green-100 dark:bg-green-900/30': fw.overall_score >= 80,
+                             'bg-amber-100 dark:bg-amber-900/30': fw.overall_score >= 60 && fw.overall_score < 80,
+                             'bg-orange-100 dark:bg-orange-900/30': fw.overall_score >= 40 && fw.overall_score < 60,
+                             'bg-red-100 dark:bg-red-900/30': fw.overall_score < 40
+                           }">
+                        <span class="text-sm font-black"
+                              :class="{
+                                'text-green-600 dark:text-green-400': fw.overall_score >= 80,
+                                'text-amber-600 dark:text-amber-400': fw.overall_score >= 60 && fw.overall_score < 80,
+                                'text-orange-600 dark:text-orange-400': fw.overall_score >= 40 && fw.overall_score < 60,
+                                'text-red-600 dark:text-red-400': fw.overall_score < 40
+                              }"
+                              x-text="fw.grade"></span>
+                      </div>
+                      <div>
+                        <p class="text-sm font-bold text-gray-900 dark:text-white" x-text="fw.framework + ' ' + fw.version"></p>
+                        <p class="text-xs text-gray-500" x-text="fw.compliance_statement"></p>
+                      </div>
+                    </div>
+                    <span class="text-2xl font-black"
+                          :class="{
+                            'text-green-500': fw.overall_score >= 80,
+                            'text-amber-500': fw.overall_score >= 60 && fw.overall_score < 80,
+                            'text-orange-500': fw.overall_score >= 40 && fw.overall_score < 60,
+                            'text-red-500': fw.overall_score < 40
+                          }"
+                          x-text="fw.overall_score.toFixed(0) + '/100'"></span>
+                  </div>
+
+                  <!-- Contrôles -->
+                  <div class="divide-y divide-gray-100 dark:divide-gray-800">
+                    <template x-for="ctrl in fw.controls" :key="ctrl.id">
+                      <div class="px-5 py-4">
+                        <!-- Contrôle header -->
+                        <div class="flex items-start justify-between gap-3 mb-2">
+                          <div class="flex items-center gap-2.5 flex-1 min-w-0">
+                            <!-- Status icon -->
+                            <div class="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
+                                 :class="{
+                                   'bg-green-100 dark:bg-green-900/30': ctrl.status === 'pass',
+                                   'bg-red-100 dark:bg-red-900/30': ctrl.status === 'fail',
+                                   'bg-amber-100 dark:bg-amber-900/30': ctrl.status === 'partial',
+                                   'bg-gray-100 dark:bg-gray-800': ctrl.status === 'na'
+                                 }">
+                              <template x-if="ctrl.status === 'pass'">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                              </template>
+                              <template x-if="ctrl.status === 'fail'">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                              </template>
+                              <template x-if="ctrl.status === 'partial'">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="3"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                              </template>
+                              <template x-if="ctrl.status === 'na'">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2"><circle cx="12" cy="12" r="1"/></svg>
+                              </template>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                              <div class="flex items-center gap-2 flex-wrap">
+                                <span class="text-xs font-mono text-gray-400" x-text="ctrl.id"></span>
+                                <span class="text-sm font-semibold text-gray-900 dark:text-white" x-text="ctrl.title"></span>
+                              </div>
+                              <p class="text-xs text-gray-500 mt-0.5" x-text="ctrl.category"></p>
+                            </div>
+                          </div>
+                          <div class="flex items-center gap-2 flex-shrink-0">
+                            <span class="text-xs font-bold px-2 py-1 rounded-lg"
+                                  :class="{
+                                    'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400': ctrl.status === 'pass',
+                                    'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400': ctrl.status === 'fail',
+                                    'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400': ctrl.status === 'partial',
+                                    'bg-gray-100 dark:bg-gray-800 text-gray-500': ctrl.status === 'na'
+                                  }"
+                                  x-text="({pass:'CONFORME', fail:'NON CONFORME', partial:'PARTIEL', na:'N/A'})[ctrl.status]"></span>
+                            <span class="text-sm font-bold w-10 text-right"
+                                  :class="{
+                                    'text-green-600': ctrl.score >= 80,
+                                    'text-amber-500': ctrl.score >= 50 && ctrl.score < 80,
+                                    'text-red-500': ctrl.score < 50
+                                  }"
+                                  x-text="ctrl.score + '%'"></span>
+                          </div>
+                        </div>
+
+                        <!-- Détails dépliables -->
+                        <div x-data="{ open: ctrl.status === 'fail' || ctrl.status === 'partial' }">
+                          <button @click="open = !open"
+                                  class="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors mt-1 mb-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                 :class="open ? 'rotate-180' : ''" class="transition-transform">
+                              <polyline points="6 9 12 15 18 9"/>
+                            </svg>
+                            <span x-text="open ? 'Masquer les détails' : 'Voir exigence, preuves et remédiation'"></span>
+                          </button>
+
+                          <div x-show="open" x-collapse class="space-y-3">
+                            <!-- Exigence -->
+                            <div class="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-3 border-l-2 border-indigo-300 dark:border-indigo-700">
+                              <p class="text-xs font-bold text-indigo-600 dark:text-indigo-400 mb-1 uppercase tracking-wide">Exigence du standard</p>
+                              <p class="text-xs text-gray-600 dark:text-gray-400 leading-relaxed" x-text="ctrl.requirement"></p>
+                            </div>
+
+                            <!-- Preuves -->
+                            <div x-show="ctrl.evidence?.length">
+                              <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Preuves du scan</p>
+                              <template x-for="(ev, i) in ctrl.evidence" :key="i">
+                                <div class="flex items-start gap-2 text-xs py-1">
+                                  <span class="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0"
+                                        :class="ev.startsWith('[CRITICAL]') ? 'bg-red-500' : ev.startsWith('[HIGH]') ? 'bg-orange-500' : ev.startsWith('[MEDIUM]') ? 'bg-amber-500' : 'bg-gray-400'"></span>
+                                  <span class="text-gray-600 dark:text-gray-400 font-mono" x-text="ev"></span>
+                                </div>
+                              </template>
+                            </div>
+
+                            <!-- Impact -->
+                            <div class="bg-orange-50 dark:bg-orange-900/10 rounded-xl p-3 border border-orange-100 dark:border-orange-900/30">
+                              <p class="text-xs font-bold text-orange-600 dark:text-orange-400 mb-1 uppercase tracking-wide">Impact business / légal</p>
+                              <p class="text-xs text-gray-600 dark:text-gray-400 leading-relaxed" x-text="ctrl.impact"></p>
+                            </div>
+
+                            <!-- Remédiation -->
+                            <div x-show="ctrl.status !== 'pass'">
+                              <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Plan de remédiation</p>
+                              <template x-for="(step, i) in ctrl.remediation" :key="i">
+                                <div class="flex items-start gap-2 text-xs py-1">
+                                  <span class="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold flex-shrink-0 mt-0.5" x-text="i + 1"></span>
+                                  <span class="text-gray-700 dark:text-gray-300" x-text="step"></span>
+                                </div>
+                              </template>
+                            </div>
+
+                            <!-- CWE refs -->
+                            <div x-show="ctrl.cwe_references?.length" class="flex flex-wrap gap-1.5">
+                              <template x-for="cwe in ctrl.cwe_references" :key="cwe">
+                                <a :href="'https://cwe.mitre.org/data/definitions/' + cwe.replace('CWE-','')+'.html'"
+                                   target="_blank"
+                                   class="px-2 py-0.5 rounded-lg text-xs font-mono font-semibold
+                                          bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400
+                                          border border-purple-200 dark:border-purple-800
+                                          hover:bg-purple-100 transition-colors"
+                                   x-text="cwe"></a>
+                              </template>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </template>
+
+          <div x-show="!scan.compliance_reports"
+               class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-12 text-center text-gray-500 shadow-sm">
+            Rapport de conformité non disponible pour ce type de scan.
+          </div>
+        </div>
+
         <!-- ===== TAB: REMÉDIATION ===== -->
         <div x-show="activeTab === 'remediation'" class="mt-4">
           <div x-show="!scan.attack_paths?.top_priorities?.length" x-cloak
@@ -691,6 +925,9 @@ function scanDetailApp(scanId) {
       ];
       if (this.scan?.scan_type === 'cti') {
         base.push({ key: 'threat_intel', label: 'Threat Intel', count: null });
+      }
+      if (this.scan?.scan_type !== 'cti' && this.scan?.compliance_reports) {
+        base.push({ key: 'compliance', label: 'Conformité', count: null });
       }
       base.push(
         { key: 'attacks',     label: 'Chemins d\'attaque', count: this.scan?.attack_paths?.attack_paths?.length ?? 0 },

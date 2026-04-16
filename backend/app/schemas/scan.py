@@ -32,6 +32,7 @@ class ScanResponse(BaseModel):
     summary: Optional[str]
     attack_paths: Optional[Any]
     threat_intel: Optional[Any] = None
+    compliance_reports: Optional[Any] = None
     created_at: datetime
     completed_at: Optional[datetime]
     vulnerabilities: List[VulnerabilityResponse] = []

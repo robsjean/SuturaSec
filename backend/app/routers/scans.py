@@ -84,6 +84,11 @@ def _run_scan(scan_id: int, db_url: str):
             "top_priorities": ai_result.get("top_priorities", []),
             "quick_wins": ai_result.get("quick_wins", []),
         }
+        # Compliance analysis (web + network uniquement — pas CTI)
+        if scan.scan_type in ("web", "network") and findings:
+            from app.services.compliance_engine import run_compliance_analysis
+            scan.compliance_reports = run_compliance_analysis(findings)
+
         scan.status = "completed"
         scan.completed_at = datetime.utcnow()
         db.commit()
