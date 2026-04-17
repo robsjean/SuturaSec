@@ -41,8 +41,7 @@ def _run_scan(scan_id: int, db_url: str):
         elif scan.scan_type == "network":
             scanner = NetworkScanner(scan.target)
             findings = scanner.run()
-        else:
-            # CTI scan
+        elif scan.scan_type == "cti":
             from app.scanners.cti_scanner import CTIScanner
             from app.config import settings as cfg
             cti = CTIScanner(
@@ -51,6 +50,12 @@ def _run_scan(scan_id: int, db_url: str):
             )
             findings, threat_intel = cti.run()
             scan.threat_intel = threat_intel
+        else:
+            # Subdomain enumeration
+            from app.scanners.subdomain_scanner import SubdomainScanner
+            sub_scanner = SubdomainScanner(scan.target)
+            findings, subdomain_results = sub_scanner.run()
+            scan.subdomain_results = subdomain_results
 
         vulns = [
             Vulnerability(
@@ -84,7 +89,7 @@ def _run_scan(scan_id: int, db_url: str):
             "top_priorities": ai_result.get("top_priorities", []),
             "quick_wins": ai_result.get("quick_wins", []),
         }
-        # Compliance analysis (web + network uniquement — pas CTI)
+        # Compliance analysis (web + network uniquement — pas CTI ni subdomain)
         if scan.scan_type in ("web", "network") and findings:
             from app.services.compliance_engine import run_compliance_analysis
             scan.compliance_reports = run_compliance_analysis(findings)
@@ -111,8 +116,8 @@ def create_scan(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if scan_data.scan_type not in ("web", "network", "cti"):
-        raise HTTPException(status_code=400, detail="scan_type doit être 'web' ou 'network'")
+    if scan_data.scan_type not in ("web", "network", "cti", "subdomain"):
+        raise HTTPException(status_code=400, detail="scan_type doit être 'web', 'network', 'cti' ou 'subdomain'")
 
     scan = Scan(
         user_id=current_user.id,
@@ -137,6 +142,7 @@ def list_scans(db: Session = Depends(get_db), current_user: User = Depends(get_c
     for scan in scans:
         vulns = scan.vulnerabilities
         cr = scan.compliance_reports or {}
+        sr = scan.subdomain_results or {}
         item = ScanListResponse(
             id=scan.id,
             target=scan.target,
@@ -152,6 +158,7 @@ def list_scans(db: Session = Depends(get_db), current_user: User = Depends(get_c
             low_count=sum(1 for v in vulns if v.severity == "low"),
             compliance_score=cr.get("global_score"),
             compliance_grade=cr.get("global_grade"),
+            subdomain_count=sr.get("total_found"),
         )
         result.append(item)
     return result

@@ -17,6 +17,7 @@ class Scan(Base):
     attack_paths = Column(JSON, nullable=True)
     threat_intel = Column(JSON, nullable=True)
     compliance_reports = Column(JSON, nullable=True)
+    subdomain_results = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     completed_at = Column(DateTime, nullable=True)
 
