@@ -96,6 +96,8 @@ def _scan_type_label(t: str) -> str:
         "network": "Analyse Réseau",
         "cti": "Threat Intelligence",
         "subdomain": "Subdomain Enumeration",
+        "api": "API Security Scanner",
+        "osint": "OSINT Recon",
     }.get(t, t)
 
 
@@ -148,6 +150,8 @@ def generate_pdf_report(scan) -> bytes:
         "compliance":     scan.compliance_reports,
         "threat_intel":   scan.threat_intel,
         "subdomain":      scan.subdomain_results,
+        "api":            scan.api_results,
+        "osint":          scan.osint_results,
     }
 
     html_content = template.render(**ctx)

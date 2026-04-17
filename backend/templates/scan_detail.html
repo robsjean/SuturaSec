@@ -42,13 +42,14 @@
           <div class="flex items-center gap-4">
             <!-- Type icon -->
             <div class="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
-                 :class="scan.scan_type === 'web'
-                   ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-500 dark:text-blue-400'
-                   : scan.scan_type === 'cti'
-                     ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500 dark:text-emerald-400'
-                     : scan.scan_type === 'subdomain'
-                       ? 'bg-violet-50 dark:bg-violet-900/20 text-violet-500 dark:text-violet-400'
-                       : 'bg-purple-50 dark:bg-purple-900/20 text-purple-500 dark:text-purple-400'">
+                 :class="{
+                   'bg-blue-50 dark:bg-blue-900/20 text-blue-500 dark:text-blue-400': scan.scan_type === 'web',
+                   'bg-purple-50 dark:bg-purple-900/20 text-purple-500 dark:text-purple-400': scan.scan_type === 'network',
+                   'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500 dark:text-emerald-400': scan.scan_type === 'cti',
+                   'bg-violet-50 dark:bg-violet-900/20 text-violet-500 dark:text-violet-400': scan.scan_type === 'subdomain',
+                   'bg-orange-50 dark:bg-orange-900/20 text-orange-500 dark:text-orange-400': scan.scan_type === 'api',
+                   'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-500 dark:text-cyan-400': scan.scan_type === 'osint',
+                 }">
               <template x-if="scan.scan_type === 'web'">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
@@ -74,11 +75,22 @@
                   <line x1="6" y1="18" x2="10" y2="13"/><line x1="18" y1="18" x2="14" y2="13"/>
                 </svg>
               </template>
+              <template x-if="scan.scan_type === 'api'">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+                </svg>
+              </template>
+              <template x-if="scan.scan_type === 'osint'">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                  <line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
+                </svg>
+              </template>
             </div>
             <div>
               <h2 class="text-lg font-bold text-gray-900 dark:text-white break-all" x-text="scan.target"></h2>
               <p class="text-sm text-gray-500 mt-0.5">
-                <span x-text="scan.scan_type === 'web' ? 'Analyse Web' : scan.scan_type === 'cti' ? 'Threat Intelligence' : scan.scan_type === 'subdomain' ? 'Subdomain Enumeration' : 'Analyse Réseau'"></span>
+                <span x-text="{'web':'Analyse Web','network':'Analyse Réseau','cti':'Threat Intelligence','subdomain':'Subdomain Enumeration','api':'API Security Scanner','osint':'OSINT Recon'}[scan.scan_type] || scan.scan_type"></span>
                 · <span x-text="new Date(scan.created_at).toLocaleDateString('fr-FR', { day:'2-digit', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' })"></span>
               </p>
             </div>
@@ -132,7 +144,7 @@
           </div>
         </div>
 
-        <!-- Severity counts (web / network / cti) -->
+        <!-- Severity counts (web / network / cti / api / osint) -->
         <template x-if="scan.scan_type !== 'subdomain'">
           <template x-for="sev in ['critical','high','medium','low']" :key="sev">
             <div class="rounded-2xl p-4 border shadow-sm" :class="severityCard(sev)">
@@ -1120,6 +1132,311 @@
           </div>
         </div>
 
+        <!-- ===== TAB: API SECURITY ===== -->
+        <div x-show="activeTab === 'api'" x-cloak class="mt-4 space-y-4">
+          <template x-if="scan.api_results">
+            <div>
+              <!-- Summary cards -->
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                <div class="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-2xl p-4 text-center">
+                  <p class="text-xs font-bold text-orange-500 uppercase tracking-wider mb-1">Endpoints</p>
+                  <p class="text-3xl font-bold text-orange-600 dark:text-orange-400" x-text="scan.api_results.total_endpoints"></p>
+                  <p class="text-xs text-gray-500 mt-0.5">découverts</p>
+                </div>
+                <div class="rounded-2xl p-4 text-center border"
+                     :class="scan.vulnerabilities?.filter(v=>v.severity==='critical').length > 0
+                       ? 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20'
+                       : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900'">
+                  <p class="text-xs font-bold uppercase tracking-wider mb-1"
+                     :class="scan.vulnerabilities?.filter(v=>v.severity==='critical').length > 0 ? 'text-red-500' : 'text-gray-500'">Critiques</p>
+                  <p class="text-3xl font-bold text-gray-900 dark:text-white" x-text="scan.vulnerabilities?.filter(v=>v.severity==='critical').length ?? 0"></p>
+                  <p class="text-xs text-gray-500 mt-0.5">findings</p>
+                </div>
+                <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 text-center shadow-sm">
+                  <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Swagger</p>
+                  <p class="text-3xl font-bold" :class="scan.api_results.swagger_found ? 'text-green-600 dark:text-green-400' : 'text-gray-400'"
+                     x-text="scan.api_results.swagger_found ? '✓' : '—'"></p>
+                  <p class="text-xs text-gray-500 mt-0.5">spec trouvée</p>
+                </div>
+                <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 text-center shadow-sm">
+                  <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">GraphQL</p>
+                  <p class="text-3xl font-bold" :class="scan.api_results.graphql_found ? 'text-amber-600 dark:text-amber-400' : 'text-gray-400'"
+                     x-text="scan.api_results.graphql_found ? '⚠' : '—'"></p>
+                  <p class="text-xs text-gray-500 mt-0.5">détecté</p>
+                </div>
+              </div>
+
+              <!-- OWASP coverage badges -->
+              <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm mb-4">
+                <p class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Couverture OWASP API Top 10</p>
+                <div class="flex flex-wrap gap-2">
+                  <template x-for="cat in (scan.api_results.owasp_coverage || [])" :key="cat">
+                    <span class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300" x-text="cat"></span>
+                  </template>
+                  <span x-show="!(scan.api_results.owasp_coverage?.length)" class="text-sm text-gray-400">Aucune vulnérabilité détectée</span>
+                </div>
+              </div>
+
+              <!-- Endpoints table -->
+              <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm overflow-hidden"
+                   x-data="{ epSearch: '' }">
+                <div class="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                  <p class="font-semibold text-gray-900 dark:text-white text-sm">Endpoints découverts</p>
+                  <input x-model="epSearch" placeholder="Filtrer..." type="text"
+                         class="rounded-lg px-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-orange-500 w-48" />
+                </div>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-sm">
+                    <thead>
+                      <tr class="bg-gray-50 dark:bg-gray-800 text-left">
+                        <th class="px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Méthode</th>
+                        <th class="px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Endpoint</th>
+                        <th class="px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Statut</th>
+                        <th class="px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Taille</th>
+                        <th class="px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Latence</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                      <template x-for="ep in (scan.api_results.endpoints_found || []).filter(e => !epSearch || e.path?.includes(epSearch))" :key="ep.path">
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                          <td class="px-4 py-2.5">
+                            <span class="px-1.5 py-0.5 rounded text-xs font-mono font-bold bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300">GET</span>
+                          </td>
+                          <td class="px-4 py-2.5 font-mono text-xs text-gray-900 dark:text-white" x-text="ep.path"></td>
+                          <td class="px-4 py-2.5">
+                            <span class="px-2 py-0.5 rounded-full text-xs font-bold"
+                                  :class="{
+                                    'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300': ep.status_code < 300,
+                                    'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300': ep.status_code >= 300 && ep.status_code < 400,
+                                    'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300': ep.status_code >= 400,
+                                  }"
+                                  x-text="ep.status_code"></span>
+                          </td>
+                          <td class="px-4 py-2.5 text-xs text-gray-500" x-text="ep.response_size ? (ep.response_size > 1024 ? (ep.response_size/1024).toFixed(1)+'KB' : ep.response_size+'B') : '—'"></td>
+                          <td class="px-4 py-2.5 text-xs text-gray-500" x-text="ep.response_time_ms ? ep.response_time_ms+'ms' : '—'"></td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </template>
+          <div x-show="!scan.api_results"
+               class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-12 text-center text-gray-500 shadow-sm">
+            Données API Security non disponibles pour ce type de scan.
+          </div>
+        </div>
+
+        <!-- ===== TAB: OSINT RECON ===== -->
+        <div x-show="activeTab === 'osint'" x-cloak class="mt-4 space-y-4">
+          <template x-if="scan.osint_results">
+            <div class="space-y-4">
+
+              <!-- Summary grid -->
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <!-- WHOIS -->
+                <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
+                  <p class="text-xs font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wider mb-3">WHOIS / Domaine</p>
+                  <dl class="space-y-1.5 text-sm">
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-gray-500">Registrar</dt>
+                      <dd class="font-medium text-gray-900 dark:text-white text-right truncate max-w-[160px]" x-text="scan.osint_results.whois?.registrar || '—'"></dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-gray-500">Créé</dt>
+                      <dd class="font-medium text-gray-900 dark:text-white" x-text="(scan.osint_results.whois?.created || '—').slice(0,10)"></dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-gray-500">Expire</dt>
+                      <dd class="font-medium text-gray-900 dark:text-white" x-text="(scan.osint_results.whois?.expires || '—').slice(0,10)"></dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-gray-500">Org</dt>
+                      <dd class="font-medium text-gray-900 dark:text-white text-right truncate max-w-[160px]" x-text="scan.osint_results.whois?.registrant_org || '—'"></dd>
+                    </div>
+                  </dl>
+                </div>
+
+                <!-- SSL Cert -->
+                <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
+                  <p class="text-xs font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wider mb-3">Certificat SSL/TLS</p>
+                  <dl class="space-y-1.5 text-sm">
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-gray-500">Sujet</dt>
+                      <dd class="font-medium text-gray-900 dark:text-white text-right truncate max-w-[160px]" x-text="scan.osint_results.ssl_cert?.subject || '—'"></dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-gray-500">Émetteur</dt>
+                      <dd class="font-medium text-gray-900 dark:text-white text-right truncate max-w-[160px]" x-text="scan.osint_results.ssl_cert?.issuer || '—'"></dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-gray-500">Expire dans</dt>
+                      <dd class="font-bold"
+                          :class="{
+                            'text-red-500': scan.osint_results.ssl_cert?.days_remaining <= 30,
+                            'text-amber-500': scan.osint_results.ssl_cert?.days_remaining > 30 && scan.osint_results.ssl_cert?.days_remaining <= 90,
+                            'text-green-500': scan.osint_results.ssl_cert?.days_remaining > 90
+                          }"
+                          x-text="scan.osint_results.ssl_cert?.days_remaining != null ? scan.osint_results.ssl_cert.days_remaining + ' jours' : '—'"></dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-gray-500">Auto-signé</dt>
+                      <dd class="font-bold" :class="scan.osint_results.ssl_cert?.is_self_signed ? 'text-red-500' : 'text-green-500'"
+                          x-text="scan.osint_results.ssl_cert?.is_self_signed != null ? (scan.osint_results.ssl_cert.is_self_signed ? 'Oui ⚠' : 'Non ✓') : '—'"></dd>
+                    </div>
+                  </dl>
+                </div>
+
+                <!-- IP / ASN / Geo -->
+                <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
+                  <p class="text-xs font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wider mb-3">Infrastructure</p>
+                  <dl class="space-y-1.5 text-sm">
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-gray-500">IPs</dt>
+                      <dd class="font-mono text-xs text-gray-900 dark:text-white text-right" x-text="(scan.osint_results.ip_addresses || []).join(', ') || '—'"></dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-gray-500">ASN</dt>
+                      <dd class="font-medium text-gray-900 dark:text-white" x-text="scan.osint_results.asn_info?.asn || '—'"></dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-gray-500">Organisation</dt>
+                      <dd class="font-medium text-gray-900 dark:text-white text-right truncate max-w-[160px]" x-text="scan.osint_results.asn_info?.org || '—'"></dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-gray-500">Pays</dt>
+                      <dd class="font-medium text-gray-900 dark:text-white" x-text="scan.osint_results.asn_info?.country || scan.osint_results.geo_info?.country || '—'"></dd>
+                    </div>
+                  </dl>
+                </div>
+              </div>
+
+              <!-- DNS Records -->
+              <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
+                <p class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Enregistrements DNS</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <template x-for="rtype in ['A','AAAA','MX','NS','TXT','CNAME']" :key="rtype">
+                    <div x-show="(scan.osint_results.dns_records?.[rtype] || []).length > 0">
+                      <p class="text-xs font-bold text-gray-400 mb-1 uppercase" x-text="rtype"></p>
+                      <template x-for="val in (scan.osint_results.dns_records?.[rtype] || [])" :key="val">
+                        <p class="font-mono text-xs text-gray-700 dark:text-gray-300 truncate" x-text="val"></p>
+                      </template>
+                    </div>
+                  </template>
+                </div>
+              </div>
+
+              <!-- Technologies + Emails row -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- Technologies -->
+                <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
+                  <p class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Technologies détectées</p>
+                  <div x-show="scan.osint_results.technologies?.server || scan.osint_results.technologies?.powered_by || scan.osint_results.technologies?.cms" class="space-y-1.5 text-sm mb-3">
+                    <div class="flex justify-between" x-show="scan.osint_results.technologies?.server">
+                      <span class="text-gray-500">Serveur</span>
+                      <span class="font-mono text-xs text-gray-900 dark:text-white" x-text="scan.osint_results.technologies?.server"></span>
+                    </div>
+                    <div class="flex justify-between" x-show="scan.osint_results.technologies?.powered_by">
+                      <span class="text-gray-500">X-Powered-By</span>
+                      <span class="font-mono text-xs text-gray-900 dark:text-white" x-text="scan.osint_results.technologies?.powered_by"></span>
+                    </div>
+                    <div class="flex justify-between" x-show="scan.osint_results.technologies?.cms">
+                      <span class="text-gray-500">CMS</span>
+                      <span class="font-semibold text-gray-900 dark:text-white" x-text="scan.osint_results.technologies?.cms"></span>
+                    </div>
+                  </div>
+                  <div class="flex flex-wrap gap-1.5">
+                    <template x-for="fw in (scan.osint_results.technologies?.frameworks || [])" :key="fw">
+                      <span class="px-2 py-0.5 rounded-md text-xs font-semibold bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300" x-text="fw"></span>
+                    </template>
+                  </div>
+                  <p x-show="!(scan.osint_results.technologies?.frameworks?.length) && !scan.osint_results.technologies?.server"
+                     class="text-sm text-gray-400">Aucune technologie détectée</p>
+                </div>
+
+                <!-- Emails -->
+                <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
+                  <p class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                    Emails trouvés
+                    <span x-show="scan.osint_results.emails_found?.length"
+                          class="ml-1 px-1.5 py-0.5 rounded-full text-xs font-bold bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
+                          x-text="scan.osint_results.emails_found.length"></span>
+                  </p>
+                  <div class="space-y-1 max-h-40 overflow-y-auto">
+                    <template x-for="email in (scan.osint_results.emails_found || [])" :key="email">
+                      <p class="font-mono text-xs text-gray-700 dark:text-gray-300 py-0.5" x-text="email"></p>
+                    </template>
+                  </div>
+                  <p x-show="!scan.osint_results.emails_found?.length" class="text-sm text-gray-400">Aucun email trouvé publiquement</p>
+                </div>
+              </div>
+
+              <!-- Breach + GitHub row -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="rounded-2xl p-5 border shadow-sm"
+                     :class="scan.osint_results.breach_data?.breaches_found > 0
+                       ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                       : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'">
+                  <p class="text-xs font-bold uppercase tracking-wider mb-2"
+                     :class="scan.osint_results.breach_data?.breaches_found > 0 ? 'text-red-500' : 'text-green-500'">
+                    Data Breaches
+                  </p>
+                  <p class="text-3xl font-bold text-gray-900 dark:text-white mb-1" x-text="scan.osint_results.breach_data?.breaches_found ?? 0"></p>
+                  <div class="flex flex-wrap gap-1 mt-2">
+                    <template x-for="b in (scan.osint_results.breach_data?.breach_names || [])" :key="b">
+                      <span class="px-2 py-0.5 rounded text-xs font-semibold bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300" x-text="b"></span>
+                    </template>
+                  </div>
+                </div>
+
+                <div class="rounded-2xl p-5 border shadow-sm"
+                     :class="scan.osint_results.github_exposure?.leaks_found > 0
+                       ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+                       : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800'">
+                  <p class="text-xs font-bold uppercase tracking-wider mb-2"
+                     :class="scan.osint_results.github_exposure?.leaks_found > 0 ? 'text-amber-600' : 'text-gray-500'">
+                    GitHub Exposure
+                  </p>
+                  <p class="text-3xl font-bold text-gray-900 dark:text-white mb-1" x-text="'~' + (scan.osint_results.github_exposure?.leaks_found ?? 0)"></p>
+                  <p class="text-xs text-gray-500">résultats contenant le domaine + mots-clés sensibles</p>
+                  <div class="flex flex-wrap gap-1 mt-2">
+                    <template x-for="repo in (scan.osint_results.github_exposure?.sample_repos || [])" :key="repo">
+                      <span class="px-2 py-0.5 rounded text-xs font-mono text-amber-700 dark:text-amber-300" x-text="repo"></span>
+                    </template>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Open Ports -->
+              <div x-show="scan.osint_results.open_ports?.length > 0"
+                   class="bg-white dark:bg-gray-900 border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/10 rounded-2xl p-5 shadow-sm">
+                <p class="text-sm font-semibold text-red-600 dark:text-red-400 mb-3">Ports ouverts détectés</p>
+                <div class="flex flex-wrap gap-2">
+                  <template x-for="port in (scan.osint_results.open_ports || [])" :key="port">
+                    <span class="px-3 py-1.5 rounded-xl text-sm font-mono font-bold bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300" x-text="port"></span>
+                  </template>
+                </div>
+              </div>
+
+              <!-- Recommended Dorks -->
+              <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
+                <p class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Google Dorks recommandés</p>
+                <div class="space-y-1.5">
+                  <template x-for="dork in (scan.osint_results.recommended_dorks || [])" :key="dork">
+                    <p class="font-mono text-xs bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 text-gray-700 dark:text-gray-300 break-all" x-text="dork"></p>
+                  </template>
+                </div>
+              </div>
+
+            </div>
+          </template>
+          <div x-show="!scan.osint_results"
+               class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-12 text-center text-gray-500 shadow-sm">
+            Données OSINT non disponibles pour ce type de scan.
+          </div>
+        </div>
+
         <!-- ===== TAB: REMÉDIATION ===== -->
         <div x-show="activeTab === 'remediation'" class="mt-4">
           <div x-show="!scan.attack_paths?.top_priorities?.length" x-cloak
@@ -1197,11 +1514,22 @@ function scanDetailApp(scanId) {
           count: this.scan?.subdomain_results?.total_found ?? null,
         });
       }
+      if (this.scan?.scan_type === 'api') {
+        base.push({
+          key: 'api',
+          label: 'API Endpoints',
+          count: this.scan?.api_results?.total_endpoints ?? null,
+        });
+      }
+      if (this.scan?.scan_type === 'osint') {
+        base.push({ key: 'osint', label: 'OSINT Intel', count: null });
+      }
       if (this.scan?.scan_type !== 'cti' && this.scan?.scan_type !== 'subdomain'
+          && this.scan?.scan_type !== 'api' && this.scan?.scan_type !== 'osint'
           && this.scan?.compliance_reports) {
         base.push({ key: 'compliance', label: 'Conformité', count: null });
       }
-      if (this.scan?.scan_type !== 'cti') {
+      if (this.scan?.scan_type !== 'cti' && this.scan?.scan_type !== 'osint') {
         base.push(
           { key: 'attacks',     label: 'Chemins d\'attaque', count: this.scan?.attack_paths?.attack_paths?.length ?? 0 },
           { key: 'remediation', label: 'Remédiation',         count: this.scan?.attack_paths?.top_priorities?.length ?? 0 },

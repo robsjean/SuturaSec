@@ -34,6 +34,8 @@ class ScanResponse(BaseModel):
     threat_intel: Optional[Any] = None
     compliance_reports: Optional[Any] = None
     subdomain_results: Optional[Any] = None
+    api_results: Optional[Any] = None
+    osint_results: Optional[Any] = None
     created_at: datetime
     completed_at: Optional[datetime]
     vulnerabilities: List[VulnerabilityResponse] = []
@@ -57,5 +59,7 @@ class ScanListResponse(BaseModel):
     compliance_score: Optional[float] = None
     compliance_grade: Optional[str] = None
     subdomain_count: Optional[int] = None
+    api_endpoint_count: Optional[int] = None
+    osint_finding_count: Optional[int] = None
 
     model_config = {"from_attributes": True}

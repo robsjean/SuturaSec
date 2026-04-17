@@ -220,7 +220,7 @@
           <!-- Type selector -->
           <div>
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Type d'analyse</label>
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               <button type="button" @click="newScan.scan_type = 'web'"
                       :class="newScan.scan_type === 'web'
                         ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
@@ -266,6 +266,31 @@
                 </svg>
                 Subdomains
               </button>
+
+              <!-- API Security -->
+              <button type="button" @click="newScan.scan_type = 'api'"
+                      :class="newScan.scan_type === 'api'
+                        ? 'border-orange-500 bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400'
+                        : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800'"
+                      class="flex flex-col items-center gap-2.5 p-4 rounded-xl border-2 transition-all text-sm font-medium">
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+                </svg>
+                API
+              </button>
+
+              <!-- OSINT -->
+              <button type="button" @click="newScan.scan_type = 'osint'"
+                      :class="newScan.scan_type === 'osint'
+                        ? 'border-cyan-500 bg-cyan-50 dark:bg-cyan-500/10 text-cyan-600 dark:text-cyan-400'
+                        : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800'"
+                      class="flex flex-col items-center gap-2.5 p-4 rounded-xl border-2 transition-all text-sm font-medium">
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                  <line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
+                </svg>
+                OSINT
+              </button>
             </div>
           </div>
 
@@ -273,7 +298,7 @@
           <div>
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Cible à analyser</label>
             <input type="text" x-model="newScan.target" required
-                   :placeholder="newScan.scan_type === 'web' ? 'https://example.com' : newScan.scan_type === 'network' ? '192.168.1.0/24 ou 192.168.1.1' : newScan.scan_type === 'subdomain' ? 'example.com' : 'example.com ou 1.2.3.4'"
+                   :placeholder="newScan.scan_type === 'web' ? 'https://example.com' : newScan.scan_type === 'network' ? '192.168.1.0/24 ou 192.168.1.1' : newScan.scan_type === 'subdomain' || newScan.scan_type === 'osint' ? 'example.com' : newScan.scan_type === 'api' ? 'https://api.example.com' : 'example.com ou 1.2.3.4'"
                    class="w-full rounded-xl px-4 py-3 text-sm
                           bg-gray-50 dark:bg-gray-800
                           border border-gray-200 dark:border-gray-700
@@ -364,13 +389,14 @@
 
           <!-- Type icon -->
           <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-               :class="scan.scan_type === 'web'
-                 ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-500 dark:text-blue-400'
-                 : scan.scan_type === 'cti'
-                   ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500 dark:text-emerald-400'
-                   : scan.scan_type === 'subdomain'
-                     ? 'bg-violet-50 dark:bg-violet-900/20 text-violet-500 dark:text-violet-400'
-                     : 'bg-purple-50 dark:bg-purple-900/20 text-purple-500 dark:text-purple-400'">
+               :class="{
+                 'bg-blue-50 dark:bg-blue-900/20 text-blue-500 dark:text-blue-400': scan.scan_type === 'web',
+                 'bg-purple-50 dark:bg-purple-900/20 text-purple-500 dark:text-purple-400': scan.scan_type === 'network',
+                 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500 dark:text-emerald-400': scan.scan_type === 'cti',
+                 'bg-violet-50 dark:bg-violet-900/20 text-violet-500 dark:text-violet-400': scan.scan_type === 'subdomain',
+                 'bg-orange-50 dark:bg-orange-900/20 text-orange-500 dark:text-orange-400': scan.scan_type === 'api',
+                 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-500 dark:text-cyan-400': scan.scan_type === 'osint',
+               }">
             <template x-if="scan.scan_type === 'web'">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
@@ -396,13 +422,24 @@
                 <line x1="6" y1="18" x2="10" y2="13"/><line x1="18" y1="18" x2="14" y2="13"/>
               </svg>
             </template>
+            <template x-if="scan.scan_type === 'api'">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+              </svg>
+            </template>
+            <template x-if="scan.scan_type === 'osint'">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                <line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
+              </svg>
+            </template>
           </div>
 
           <!-- Target + meta -->
           <div class="flex-1 min-w-0">
             <p class="text-sm font-semibold text-gray-900 dark:text-white truncate" x-text="scan.target"></p>
             <p class="text-xs text-gray-500 mt-0.5">
-              <span x-text="scan.scan_type === 'web' ? 'Web' : scan.scan_type === 'cti' ? 'Threat Intel' : scan.scan_type === 'subdomain' ? 'Subdomains' : 'Réseau'"></span>
+              <span x-text="{'web':'Web','network':'Réseau','cti':'Threat Intel','subdomain':'Subdomains','api':'API Security','osint':'OSINT'}[scan.scan_type] || scan.scan_type"></span>
               · <span x-text="new Date(scan.created_at).toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })"></span>
             </p>
           </div>
@@ -412,7 +449,13 @@
             <template x-if="scan.scan_type === 'subdomain'">
               <span class="text-gray-400">subdomains: <span class="font-bold text-violet-600 dark:text-violet-400" x-text="scan.subdomain_count ?? '—'"></span></span>
             </template>
-            <template x-if="scan.scan_type !== 'subdomain'">
+            <template x-if="scan.scan_type === 'api'">
+              <span class="text-gray-400">endpoints: <span class="font-bold text-orange-600 dark:text-orange-400" x-text="scan.api_endpoint_count ?? '—'"></span></span>
+            </template>
+            <template x-if="scan.scan_type === 'osint'">
+              <span class="text-gray-400">findings: <span class="font-bold text-cyan-600 dark:text-cyan-400" x-text="scan.vuln_count ?? '—'"></span></span>
+            </template>
+            <template x-if="scan.scan_type !== 'subdomain' && scan.scan_type !== 'api' && scan.scan_type !== 'osint'">
               <span class="text-gray-400">vulns: <span class="font-bold text-gray-700 dark:text-gray-300" x-text="scan.vuln_count || 0"></span></span>
             </template>
           </div>

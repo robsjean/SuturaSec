@@ -52,12 +52,22 @@ def _run_scan(scan_id: int, db_url: str):
             )
             findings, threat_intel = cti.run()
             scan.threat_intel = threat_intel
-        else:
-            # Subdomain enumeration
+        elif scan.scan_type == "subdomain":
             from app.scanners.subdomain_scanner import SubdomainScanner
             sub_scanner = SubdomainScanner(scan.target)
             findings, subdomain_results = sub_scanner.run()
             scan.subdomain_results = subdomain_results
+        elif scan.scan_type == "api":
+            from app.scanners.api_scanner import APIScanner
+            api_scanner = APIScanner(scan.target)
+            findings, api_results = api_scanner.run()
+            scan.api_results = api_results
+        else:
+            # OSINT recon
+            from app.scanners.osint_scanner import OSINTScanner
+            osint_scanner = OSINTScanner(scan.target)
+            findings, osint_results = osint_scanner.run()
+            scan.osint_results = osint_results
 
         vulns = [
             Vulnerability(
@@ -91,7 +101,7 @@ def _run_scan(scan_id: int, db_url: str):
             "top_priorities": ai_result.get("top_priorities", []),
             "quick_wins": ai_result.get("quick_wins", []),
         }
-        # Compliance analysis (web + network uniquement — pas CTI ni subdomain)
+        # Compliance analysis (web + network only)
         if scan.scan_type in ("web", "network") and findings:
             from app.services.compliance_engine import run_compliance_analysis
             scan.compliance_reports = run_compliance_analysis(findings)
@@ -118,8 +128,8 @@ def create_scan(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if scan_data.scan_type not in ("web", "network", "cti", "subdomain"):
-        raise HTTPException(status_code=400, detail="scan_type doit être 'web', 'network', 'cti' ou 'subdomain'")
+    if scan_data.scan_type not in ("web", "network", "cti", "subdomain", "api", "osint"):
+        raise HTTPException(status_code=400, detail="scan_type doit être 'web', 'network', 'cti', 'subdomain', 'api' ou 'osint'")
 
     scan = Scan(
         user_id=current_user.id,
@@ -145,6 +155,8 @@ def list_scans(db: Session = Depends(get_db), current_user: User = Depends(get_c
         vulns = scan.vulnerabilities
         cr = scan.compliance_reports or {}
         sr = scan.subdomain_results or {}
+        ar = scan.api_results or {}
+        or_ = scan.osint_results or {}
         item = ScanListResponse(
             id=scan.id,
             target=scan.target,
@@ -161,6 +173,8 @@ def list_scans(db: Session = Depends(get_db), current_user: User = Depends(get_c
             compliance_score=cr.get("global_score"),
             compliance_grade=cr.get("global_grade"),
             subdomain_count=sr.get("total_found"),
+            api_endpoint_count=ar.get("total_endpoints"),
+            osint_finding_count=len(vulns) if scan.scan_type == "osint" else None,
         )
         result.append(item)
     return result

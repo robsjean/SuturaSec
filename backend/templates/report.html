@@ -271,6 +271,20 @@ tr:nth-child(even) td { background:#fafafa; }
     <div><div class="cover-stat-num {% if subdomain.summary.takeover_risks > 0 %}col-critical{% else %}col-low{% endif %}">{{ subdomain.summary.takeover_risks or 0 }}</div><div class="cover-stat-lbl">Takeover</div></div>
     {% endif %}
   </div>
+  {% elif scan.scan_type == 'api' and api %}
+  <div class="cover-stats-row">
+    <div><div class="cover-stat-num" style="color:#fb923c">{{ api.total_endpoints }}</div><div class="cover-stat-lbl">Endpoints</div></div>
+    {% if sev_counts.critical > 0 %}<div><div class="cover-stat-num col-critical">{{ sev_counts.critical }}</div><div class="cover-stat-lbl">Critiques</div></div>{% endif %}
+    {% if sev_counts.high > 0 %}<div><div class="cover-stat-num col-high">{{ sev_counts.high }}</div><div class="cover-stat-lbl">Élevés</div></div>{% endif %}
+    <div><div class="cover-stat-num" style="color:{% if api.swagger_found %}#16a34a{% else %}#6b7280{% endif %}">{{ '✓' if api.swagger_found else '—' }}</div><div class="cover-stat-lbl">Swagger</div></div>
+  </div>
+  {% elif scan.scan_type == 'osint' and osint %}
+  <div class="cover-stats-row">
+    <div><div class="cover-stat-num" style="color:#22d3ee">{{ osint.emails_found | length if osint.emails_found else 0 }}</div><div class="cover-stat-lbl">Emails exposés</div></div>
+    {% if osint.breach_data and osint.breach_data.breaches_found > 0 %}<div><div class="cover-stat-num col-critical">{{ osint.breach_data.breaches_found }}</div><div class="cover-stat-lbl">Breaches</div></div>{% endif %}
+    {% if osint.open_ports %}<div><div class="cover-stat-num col-high">{{ osint.open_ports | length }}</div><div class="cover-stat-lbl">Ports ouverts</div></div>{% endif %}
+    <div><div class="cover-stat-num" style="color:{% if osint.github_exposure and osint.github_exposure.leaks_found > 0 %}#d97706{% else %}#16a34a{% endif %}">{{ osint.github_exposure.leaks_found if osint.github_exposure else 0 }}</div><div class="cover-stat-lbl">GitHub leaks</div></div>
+  </div>
   {% endif %}
 
   <div class="cover-footer">Document confidentiel — SuturaSec {{ generated_at[:4] }}</div>
@@ -601,6 +615,212 @@ tr:nth-child(even) td { background:#fafafa; }
     <tr><td colspan="4" style="text-align:center;color:#9ca3af;font-style:italic;">… {{ active_subs|length - 80 }} entrées supplémentaires non affichées</td></tr>
     {% endif %}
   </table>
+  {% endif %}
+</div>
+{% endif %}
+
+
+{# ================================================================
+   API SECURITY SECTION
+   ================================================================ #}
+{% if api and scan.scan_type == 'api' %}
+<div class="section">
+  <div class="section-header">
+    <div class="section-num">02</div>
+    <div>
+      <div class="section-title">API Security — OWASP API Top 10 (2023)</div>
+      <div class="section-desc">{{ api.total_endpoints }} endpoint(s) découverts · Durée : {{ api.scan_duration_seconds }}s</div>
+    </div>
+  </div>
+
+  <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:6mm;">
+    <div class="stat-card" style="border-color:#f97316;background:#fff7ed;">
+      <div class="stat-label">Endpoints</div>
+      <div class="stat-value" style="color:#ea580c;">{{ api.total_endpoints }}</div>
+    </div>
+    <div class="stat-card {% if sev_counts.critical > 0 %}card-critical{% endif %}">
+      <div class="stat-label">Critiques</div>
+      <div class="stat-value {% if sev_counts.critical > 0 %}val-critical{% else %}val-green{% endif %}">{{ sev_counts.critical }}</div>
+    </div>
+    <div class="stat-card {% if api.swagger_found %}card-green{% endif %}">
+      <div class="stat-label">Swagger/OpenAPI</div>
+      <div class="stat-value" style="font-size:10pt;padding-top:5mm;color:{% if api.swagger_found %}#16a34a{% else %}#6b7280{% endif %};">
+        {{ '✓ Trouvé' if api.swagger_found else '— Absent' }}
+      </div>
+    </div>
+    <div class="stat-card {% if api.graphql_found %}card-medium{% endif %}">
+      <div class="stat-label">GraphQL</div>
+      <div class="stat-value" style="font-size:10pt;padding-top:5mm;color:{% if api.graphql_found %}#d97706{% else %}#6b7280{% endif %};">
+        {{ '⚠ Détecté' if api.graphql_found else '— Absent' }}
+      </div>
+    </div>
+  </div>
+
+  {% if api.owasp_coverage %}
+  <p style="font-size:8.5pt;color:#6b7280;margin-bottom:3mm;"><strong>Couverture OWASP :</strong>
+  {% for cat in api.owasp_coverage %}<span style="display:inline-block;background:#fff7ed;border:1px solid #fed7aa;color:#ea580c;border-radius:4px;padding:1px 5px;margin:1px;font-size:7.5pt;font-weight:700;">{{ cat }}</span>{% endfor %}
+  </p>
+  {% endif %}
+
+  {% if api.endpoints_found %}
+  <h3 style="font-size:10pt;font-weight:700;color:#1e293b;margin:4mm 0 2mm;">Endpoints découverts</h3>
+  <table style="width:100%;border-collapse:collapse;font-size:8pt;">
+    <thead>
+      <tr style="background:#f8fafc;">
+        <th style="padding:3mm 2mm;text-align:left;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:7.5pt;text-transform:uppercase;">Méthode</th>
+        <th style="padding:3mm 2mm;text-align:left;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:7.5pt;text-transform:uppercase;">Path</th>
+        <th style="padding:3mm 2mm;text-align:center;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:7.5pt;text-transform:uppercase;">Status</th>
+        <th style="padding:3mm 2mm;text-align:right;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:7.5pt;text-transform:uppercase;">Latence</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ep in api.endpoints_found[:50] %}
+      <tr style="border-bottom:1px solid #f1f5f9;">
+        <td style="padding:2mm;font-family:monospace;font-size:7.5pt;color:#ea580c;font-weight:700;">GET</td>
+        <td style="padding:2mm;font-family:monospace;font-size:8pt;color:#1e293b;">{{ ep.path }}</td>
+        <td style="padding:2mm;text-align:center;">
+          <span style="padding:1px 5px;border-radius:3px;font-size:7.5pt;font-weight:700;
+            {% if ep.status_code and ep.status_code < 300 %}background:#dcfce7;color:#166534;
+            {% elif ep.status_code and ep.status_code < 400 %}background:#fef9c3;color:#854d0e;
+            {% else %}background:#fee2e2;color:#991b1b;{% endif %}">
+            {{ ep.status_code or '—' }}
+          </span>
+        </td>
+        <td style="padding:2mm;text-align:right;font-size:7.5pt;color:#6b7280;">{{ ep.response_time_ms or '—' }}ms</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if api.endpoints_found | length > 50 %}
+  <p style="font-size:7.5pt;color:#6b7280;margin-top:2mm;">... et {{ (api.endpoints_found | length) - 50 }} endpoint(s) supplémentaires.</p>
+  {% endif %}
+  {% endif %}
+</div>
+{% endif %}
+
+
+{# ================================================================
+   OSINT RECON SECTION
+   ================================================================ #}
+{% if osint and scan.scan_type == 'osint' %}
+<div class="section">
+  <div class="section-header">
+    <div class="section-num">02</div>
+    <div>
+      <div class="section-title">OSINT Recon — Renseignement Open-Source</div>
+      <div class="section-desc">{{ osint.domain }} · {{ osint.sources_queried | length }} sources interrogées · {{ osint.scan_duration_seconds }}s</div>
+    </div>
+  </div>
+
+  <!-- Infrastructure -->
+  <div class="cti-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:5mm;">
+    <div class="cti-card">
+      <div class="cti-card-title">Adresses IP</div>
+      {% for ip in (osint.ip_addresses or []) %}<div style="font-family:monospace;font-size:8.5pt;color:#1e293b;">{{ ip }}</div>{% endfor %}
+      {% if not osint.ip_addresses %}<div style="color:#6b7280;font-size:8.5pt;">—</div>{% endif %}
+    </div>
+    <div class="cti-card">
+      <div class="cti-card-title">ASN / Organisation</div>
+      <div style="font-size:8.5pt;color:#1e293b;">{{ osint.asn_info.asn or '—' }}</div>
+      <div style="font-size:8pt;color:#374151;">{{ osint.asn_info.org or '—' }}</div>
+      <div style="font-size:8pt;color:#6b7280;">{{ osint.asn_info.country or osint.geo_info.country or '—' }}</div>
+    </div>
+    <div class="cti-card">
+      <div class="cti-card-title">Certificat SSL</div>
+      <div style="font-size:8.5pt;color:#1e293b;">{{ osint.ssl_cert.subject or '—' }}</div>
+      <div style="font-size:8pt;color:#374151;">{{ osint.ssl_cert.issuer or '—' }}</div>
+      {% if osint.ssl_cert.days_remaining is not none %}
+      <div style="font-size:8pt;font-weight:700;color:{% if osint.ssl_cert.days_remaining <= 30 %}#dc2626{% elif osint.ssl_cert.days_remaining <= 90 %}#d97706{% else %}#16a34a{% endif %};">
+        Expire dans {{ osint.ssl_cert.days_remaining }} jours
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- WHOIS -->
+  {% if osint.whois %}
+  <h3 style="font-size:10pt;font-weight:700;color:#1e293b;margin:4mm 0 2mm;">Informations WHOIS</h3>
+  <table style="width:100%;border-collapse:collapse;font-size:8.5pt;margin-bottom:4mm;">
+    {% if osint.whois.registrar %}<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:2mm 3mm;color:#6b7280;width:35%;">Registrar</td><td style="padding:2mm 3mm;font-weight:600;color:#1e293b;">{{ osint.whois.registrar }}</td></tr>{% endif %}
+    {% if osint.whois.created %}<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:2mm 3mm;color:#6b7280;">Création</td><td style="padding:2mm 3mm;font-weight:600;color:#1e293b;">{{ osint.whois.created[:10] }}</td></tr>{% endif %}
+    {% if osint.whois.expires %}<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:2mm 3mm;color:#6b7280;">Expiration</td><td style="padding:2mm 3mm;font-weight:600;color:#1e293b;">{{ osint.whois.expires[:10] }}</td></tr>{% endif %}
+    {% if osint.whois.registrant_org %}<tr><td style="padding:2mm 3mm;color:#6b7280;">Organisation</td><td style="padding:2mm 3mm;font-weight:600;color:#1e293b;">{{ osint.whois.registrant_org }}</td></tr>{% endif %}
+  </table>
+  {% endif %}
+
+  <!-- DNS Records -->
+  {% if osint.dns_records %}
+  <h3 style="font-size:10pt;font-weight:700;color:#1e293b;margin:4mm 0 2mm;">Enregistrements DNS</h3>
+  <table style="width:100%;border-collapse:collapse;font-size:8pt;margin-bottom:4mm;">
+    <thead><tr style="background:#f8fafc;"><th style="padding:2.5mm;text-align:left;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:7.5pt;">Type</th><th style="padding:2.5mm;text-align:left;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:7.5pt;">Valeur</th></tr></thead>
+    <tbody>
+      {% for rtype in ['A','AAAA','MX','NS','TXT','CNAME'] %}
+        {% for val in (osint.dns_records[rtype] or [])[:4] %}
+        <tr style="border-bottom:1px solid #f1f5f9;">
+          <td style="padding:2mm;font-weight:700;color:#0ea5e9;font-size:7.5pt;">{{ rtype }}</td>
+          <td style="padding:2mm;font-family:monospace;font-size:7.5pt;color:#1e293b;word-break:break-all;">{{ val }}</td>
+        </tr>
+        {% endfor %}
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  <!-- Technologies -->
+  {% if osint.technologies and (osint.technologies.server or osint.technologies.frameworks) %}
+  <h3 style="font-size:10pt;font-weight:700;color:#1e293b;margin:4mm 0 2mm;">Technologies Détectées</h3>
+  <div style="margin-bottom:4mm;">
+    {% if osint.technologies.server %}<p style="font-size:8.5pt;margin-bottom:1mm;"><strong>Serveur :</strong> <span style="font-family:monospace;">{{ osint.technologies.server }}</span></p>{% endif %}
+    {% if osint.technologies.cms %}<p style="font-size:8.5pt;margin-bottom:1mm;"><strong>CMS :</strong> {{ osint.technologies.cms }}</p>{% endif %}
+    {% if osint.technologies.frameworks %}
+    <div style="display:flex;flex-wrap:wrap;gap:2mm;margin-top:2mm;">
+      {% for fw in osint.technologies.frameworks %}
+      <span style="background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;border-radius:4px;padding:1px 6px;font-size:7.5pt;font-weight:600;">{{ fw }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- Breaches + GitHub + Emails row -->
+  <div class="cti-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:4mm;">
+    <div class="cti-card {% if osint.breach_data and osint.breach_data.breaches_found > 0 %}card-critical{% endif %}" style="{% if osint.breach_data and osint.breach_data.breaches_found > 0 %}background:#fee2e2;border-color:#fca5a5;{% endif %}">
+      <div class="cti-card-title" style="{% if osint.breach_data and osint.breach_data.breaches_found > 0 %}color:#dc2626;{% endif %}">Data Breaches</div>
+      <div style="font-size:22pt;font-weight:800;color:{% if osint.breach_data and osint.breach_data.breaches_found > 0 %}#dc2626{% else %}#16a34a{% endif %};">{{ osint.breach_data.breaches_found if osint.breach_data else 0 }}</div>
+      {% if osint.breach_data and osint.breach_data.breach_names %}
+      <div style="font-size:7.5pt;color:#374151;margin-top:1mm;">{{ osint.breach_data.breach_names[:3] | join(', ') }}</div>
+      {% endif %}
+    </div>
+    <div class="cti-card {% if osint.github_exposure and osint.github_exposure.leaks_found > 0 %}card-medium{% endif %}" style="{% if osint.github_exposure and osint.github_exposure.leaks_found > 0 %}background:#fffbeb;border-color:#fcd34d;{% endif %}">
+      <div class="cti-card-title">GitHub Exposure</div>
+      <div style="font-size:22pt;font-weight:800;color:{% if osint.github_exposure and osint.github_exposure.leaks_found > 0 %}#d97706{% else %}#16a34a{% endif %};">~{{ osint.github_exposure.leaks_found if osint.github_exposure else 0 }}</div>
+      <div style="font-size:7.5pt;color:#6b7280;margin-top:1mm;">résultats contenant mots-clés sensibles</div>
+    </div>
+    <div class="cti-card">
+      <div class="cti-card-title">Emails Exposés</div>
+      <div style="font-size:22pt;font-weight:800;color:{% if osint.emails_found %}#d97706{% else %}#16a34a{% endif %};">{{ osint.emails_found | length if osint.emails_found else 0 }}</div>
+      {% if osint.emails_found %}
+      <div style="font-size:7.5pt;color:#374151;margin-top:1mm;">{{ osint.emails_found[:2] | join(', ') }}{% if osint.emails_found | length > 2 %}…{% endif %}</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Open Ports -->
+  {% if osint.open_ports %}
+  <h3 style="font-size:10pt;font-weight:700;color:#dc2626;margin:4mm 0 2mm;">Ports Ouverts Détectés</h3>
+  <div style="display:flex;flex-wrap:wrap;gap:2mm;margin-bottom:4mm;">
+    {% for port in osint.open_ports %}
+    <span style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;border-radius:4px;padding:2px 8px;font-size:9pt;font-family:monospace;font-weight:700;">{{ port }}</span>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Recommended Dorks -->
+  {% if osint.recommended_dorks %}
+  <h3 style="font-size:10pt;font-weight:700;color:#1e293b;margin:4mm 0 2mm;">Google Dorks Recommandés</h3>
+  {% for dork in osint.recommended_dorks %}
+  <div style="font-family:monospace;font-size:7.5pt;background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;padding:2mm 3mm;margin-bottom:1.5mm;color:#1e293b;word-break:break-all;">{{ dork }}</div>
+  {% endfor %}
   {% endif %}
 </div>
 {% endif %}
