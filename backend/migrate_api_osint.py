@@ -1,16 +1,25 @@
 """
 Migration: add api_results and osint_results columns to scans table.
-Run once: python migrate_api_osint.py
+Run from repo root:  python backend/migrate_api_osint.py
+  OR from backend/:  python migrate_api_osint.py
 """
 import os
 import sys
+
+# Ensure imports work whether called from repo root or backend/
+BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+if BACKEND_DIR not in sys.path:
+    sys.path.insert(0, BACKEND_DIR)
+
+# Change working directory to backend/ so relative SQLite paths resolve
+os.chdir(BACKEND_DIR)
 
 try:
     from sqlalchemy import create_engine, text
     from app.config import settings
     db_url = settings.DATABASE_URL
 except Exception:
-    db_url = os.environ.get("DATABASE_URL", "sqlite:///./samasecurity.db")
+    db_url = os.environ.get("DATABASE_URL", "sqlite:///./suturasec.db")
 
 print(f"[migrate] Connecting to: {db_url}")
 
