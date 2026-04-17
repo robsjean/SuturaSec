@@ -1,403 +1,662 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8" />
-  <title>Rapport — {{ scan.target }}</title>
-  <style>
-    /* ─── Base ─── */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      font-size: 11pt;
-      color: #1a1a2e;
-      background: #fff;
-      line-height: 1.5;
-    }
-    a { color: inherit; text-decoration: none; }
+<meta charset="UTF-8"/>
+<style>
+/* ================================================================
+   WEASYPRINT PDF REPORT — SuturaSec
+   ================================================================ */
+@page {
+  size: A4;
+  margin: 18mm 16mm 22mm 16mm;
+  @bottom-left {
+    content: "SuturaSec — Rapport Confidentiel";
+    font-size: 7.5pt; color: #9ca3af; font-family: Arial, sans-serif;
+  }
+  @bottom-right {
+    content: "Page " counter(page) " / " counter(pages);
+    font-size: 7.5pt; color: #9ca3af; font-family: Arial, sans-serif;
+  }
+}
+@page cover-page {
+  margin: 0;
+  @bottom-left  { content: none; }
+  @bottom-right { content: none; }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 9.5pt; line-height: 1.55; color: #1f2937; background: white;
+}
 
-    /* ─── Print ─── */
-    @media print {
-      .no-print { display: none !important; }
-      .page-break { page-break-before: always; }
-      body { font-size: 10pt; }
-      .cover { page-break-after: always; }
-    }
-    @media screen {
-      body { max-width: 900px; margin: 0 auto; padding: 24px; background: #f4f6fa; }
-      .sheet { background: #fff; padding: 48px 56px; margin-bottom: 24px; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
-    }
-    @media print {
-      body { max-width: 100%; margin: 0; padding: 0; background: #fff; }
-      .sheet { padding: 20mm 22mm; margin: 0; box-shadow: none; border-radius: 0; }
-    }
+/* ================================================================ COVER */
+.cover {
+  page: cover-page; page-break-after: always;
+  background: linear-gradient(155deg, #0f0b2e 0%, #1e1b4b 50%, #312e81 100%);
+  min-height: 297mm; color: white;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 20mm; text-align: center;
+}
+.cover-brand     { font-size: 24pt; font-weight: 900; letter-spacing: -0.5pt; color: white; margin-bottom: 1mm; }
+.cover-brand-sub { font-size: 7pt; letter-spacing: 4pt; text-transform: uppercase; color: #a5b4fc; margin-bottom: 14mm; }
+.cover-rep-title { font-size: 26pt; font-weight: 900; color: white; margin-bottom: 2mm; letter-spacing: -0.5pt; }
+.cover-rep-type  { font-size: 11pt; color: #a5b4fc; margin-bottom: 12mm; letter-spacing: 0.5pt; }
+.cover-divider   { width: 20mm; height: 1pt; background: rgba(255,255,255,0.2); margin: 0 auto 10mm; }
+.cover-target    { font-size: 14pt; font-weight: bold; color: white; word-break: break-all; margin-bottom: 2mm; max-width: 150mm; }
+.cover-meta-line { font-size: 9pt; color: #c7d2fe; margin-bottom: 1mm; }
+.cover-risk-block {
+  margin-top: 12mm; display: inline-block; border-radius: 5mm; padding: 6mm 14mm;
+  border: 1.5pt solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.08); min-width: 55mm;
+}
+.cover-risk-lbl { font-size: 7pt; letter-spacing: 3pt; text-transform: uppercase; color: #a5b4fc; margin-bottom: 2mm; }
+.cover-score-line { display: flex; align-items: flex-end; justify-content: center; gap: 1mm; }
+.cover-score-num  { font-size: 46pt; font-weight: 900; line-height: 1; }
+.cover-score-den  { font-size: 14pt; color: rgba(255,255,255,0.5); padding-bottom: 4pt; }
+.cover-risk-lvl   { font-size: 10pt; font-weight: bold; letter-spacing: 2pt; text-transform: uppercase; margin-top: 1mm; }
+.cover-stats-row  { display: flex; gap: 6mm; margin-top: 10mm; justify-content: center; }
+.cover-stat-num   { font-size: 20pt; font-weight: 900; line-height: 1; }
+.cover-stat-lbl   { font-size: 7pt; letter-spacing: 1pt; text-transform: uppercase; color: #a5b4fc; margin-top: 1mm; }
+.cover-footer     { margin-top: 18mm; font-size: 7pt; color: rgba(255,255,255,0.3); }
 
-    /* ─── Cover ─── */
-    .cover {
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-    }
-    .cover-brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-weight: 800;
-      font-size: 18pt;
-      color: #4f46e5;
-      letter-spacing: -0.5px;
-    }
-    .cover-brand svg { width: 32px; height: 32px; }
-    .cover-main { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 60px 0 40px; }
-    .cover-badge {
-      display: inline-block;
-      background: #ede9fe;
-      color: #4f46e5;
-      font-size: 8pt;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      padding: 4px 12px;
-      border-radius: 20px;
-      margin-bottom: 20px;
-    }
-    .cover-title { font-size: 28pt; font-weight: 800; color: #0f172a; line-height: 1.15; margin-bottom: 8px; }
-    .cover-target { font-size: 14pt; color: #6366f1; font-weight: 600; margin-bottom: 32px; word-break: break-all; }
-    .cover-meta { display: flex; gap: 40px; flex-wrap: wrap; }
-    .cover-meta-item label { font-size: 8pt; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; display: block; margin-bottom: 3px; }
-    .cover-meta-item span { font-size: 11pt; font-weight: 600; color: #1e293b; }
-    .cover-risk-block { margin-top: 40px; padding: 20px 24px; border-radius: 10px; border: 2px solid; display: inline-flex; align-items: center; gap: 16px; }
-    .cover-risk-block.critical { border-color: #ef4444; background: #fef2f2; }
-    .cover-risk-block.high     { border-color: #f97316; background: #fff7ed; }
-    .cover-risk-block.medium   { border-color: #eab308; background: #fefce8; }
-    .cover-risk-block.low      { border-color: #22c55e; background: #f0fdf4; }
-    .cover-risk-score { font-size: 36pt; font-weight: 900; line-height: 1; }
-    .critical .cover-risk-score { color: #ef4444; }
-    .high     .cover-risk-score { color: #f97316; }
-    .medium   .cover-risk-score { color: #eab308; }
-    .low      .cover-risk-score { color: #22c55e; }
-    .cover-risk-label { font-size: 9pt; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
-    .cover-footer { border-top: 1px solid #e2e8f0; padding-top: 16px; display: flex; justify-content: space-between; font-size: 8pt; color: #94a3b8; }
+/* color helpers */
+.col-critical { color: #f87171; }
+.col-high     { color: #fb923c; }
+.col-medium   { color: #fbbf24; }
+.col-low      { color: #4ade80; }
+.col-info     { color: #9ca3af; }
 
-    /* ─── Section ─── */
-    .section-title {
-      font-size: 14pt; font-weight: 800; color: #0f172a;
-      border-left: 4px solid #6366f1;
-      padding-left: 12px;
-      margin-bottom: 20px;
-    }
-    .section-subtitle { font-size: 10pt; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 1px; margin: 24px 0 10px; }
+/* ================================================================ SECTIONS */
+.section { page-break-before: always; }
+.no-break { page-break-inside: avoid; }
+.section-header {
+  border-bottom: 2pt solid #4f46e5; padding-bottom: 3mm; margin-bottom: 7mm;
+  display: flex; align-items: flex-end; gap: 3mm;
+}
+.section-num {
+  font-size: 9pt; font-weight: bold; color: #6366f1;
+  background: #eef2ff; border: 1pt solid #c7d2fe; border-radius: 1.5mm;
+  padding: 0.5mm 2.5mm; flex-shrink: 0; line-height: 1.4;
+}
+.section-title { font-size: 16pt; font-weight: 900; color: #312e81; letter-spacing: -0.3pt; }
+.section-desc  { font-size: 8.5pt; color: #9ca3af; margin-top: 1mm; }
+h3 {
+  font-size: 11pt; font-weight: bold; color: #374151; margin: 5mm 0 3mm;
+  border-left: 3pt solid #c7d2fe; padding-left: 3mm;
+}
+h3:first-child { margin-top: 0; }
 
-    /* ─── Summary boxes ─── */
-    .summary-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 20px; margin-bottom: 12px; }
-    .summary-box p { color: #334155; font-size: 10.5pt; line-height: 1.6; }
-    .summary-box.warning { border-color: #fbbf24; background: #fffbeb; }
-    .summary-box.warning p { color: #78350f; }
+/* ================================================================ STATS */
+.stats-grid { display: flex; gap: 3mm; margin-bottom: 7mm; }
+.stat-card  { flex: 1; text-align: center; padding: 4mm 3mm; border-radius: 3mm; border: 1pt solid #e5e7eb; }
+.stat-label { font-size: 7pt; font-weight: bold; text-transform: uppercase; letter-spacing: 1pt; color: #9ca3af; margin-bottom: 2mm; }
+.stat-value { font-size: 24pt; font-weight: 900; line-height: 1; }
+.card-critical { border-color:#fca5a5; background:#fff5f5; }
+.card-high     { border-color:#fdba74; background:#fff8f1; }
+.card-medium   { border-color:#fde68a; background:#fffdf0; }
+.card-low      { border-color:#93c5fd; background:#f0f7ff; }
+.card-total    { border-color:#c7d2fe; background:#f0f4ff; }
+.card-violet   { border-color:#c4b5fd; background:#f5f3ff; }
+.card-green    { border-color:#86efac; background:#f0fdf4; }
+.val-critical  { color:#dc2626; }
+.val-high      { color:#ea580c; }
+.val-medium    { color:#d97706; }
+.val-low       { color:#2563eb; }
+.val-total     { color:#4f46e5; }
+.val-violet    { color:#7c3aed; }
+.val-green     { color:#16a34a; }
 
-    /* ─── Stats grid ─── */
-    .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 24px; }
-    .stat-card { border-radius: 8px; padding: 14px 16px; border: 1px solid; }
-    .stat-card label { font-size: 7.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 4px; }
-    .stat-card span { font-size: 22pt; font-weight: 900; display: block; line-height: 1; }
-    .stat-card.risk    { border-color: #c7d2fe; background: #eef2ff; }
-    .stat-card.risk label { color: #6366f1; }
-    .stat-card.risk span { color: #4338ca; }
-    .stat-card.critical { border-color: #fca5a5; background: #fef2f2; }
-    .stat-card.critical label { color: #dc2626; }
-    .stat-card.critical span { color: #b91c1c; }
-    .stat-card.high    { border-color: #fdba74; background: #fff7ed; }
-    .stat-card.high label { color: #ea580c; }
-    .stat-card.high span { color: #c2410c; }
-    .stat-card.medium  { border-color: #fde68a; background: #fefce8; }
-    .stat-card.medium label { color: #ca8a04; }
-    .stat-card.medium span { color: #a16207; }
-    .stat-card.low     { border-color: #86efac; background: #f0fdf4; }
-    .stat-card.low label { color: #16a34a; }
-    .stat-card.low span { color: #15803d; }
+/* ================================================================ SUMMARY BOX */
+.sum-box { background:#f0f4ff; border-left:4pt solid #4f46e5; padding:5mm 5mm 5mm 6mm; border-radius:0 3mm 3mm 0; margin-bottom:6mm; }
+.sum-box-lbl  { font-size:7pt; font-weight:bold; text-transform:uppercase; letter-spacing:1.5pt; color:#6366f1; margin-bottom:2mm; }
+.sum-box-txt  { font-size:10pt; color:#374151; line-height:1.7; }
+.sum-box-warn { background:#fff8f1; border-color:#f97316; }
+.sum-lbl-warn { color:#ea580c; }
 
-    /* ─── Vuln table ─── */
-    table { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
-    thead th { background: #f1f5f9; text-align: left; padding: 9px 12px; font-size: 8pt; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; color: #64748b; border-bottom: 2px solid #e2e8f0; }
-    tbody tr { border-bottom: 1px solid #f1f5f9; }
-    tbody tr:hover { background: #f8fafc; }
-    tbody td { padding: 10px 12px; vertical-align: top; }
-    .badge {
-      display: inline-block; font-size: 7.5pt; font-weight: 700;
-      padding: 2px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: .5px;
-    }
-    .badge.critical { background: #fee2e2; color: #b91c1c; }
-    .badge.high     { background: #ffedd5; color: #c2410c; }
-    .badge.medium   { background: #fef9c3; color: #a16207; }
-    .badge.low      { background: #dcfce7; color: #15803d; }
-    .badge.info     { background: #f1f5f9; color: #475569; }
-    .vuln-title { font-weight: 600; color: #1e293b; }
-    .vuln-cat   { font-size: 8pt; color: #6366f1; margin-top: 2px; }
-    .vuln-rem   { font-size: 8.5pt; color: #475569; margin-top: 4px; font-style: italic; }
+/* ================================================================ VULN CARDS */
+.vuln-card { border:1pt solid #e5e7eb; border-radius:3mm; margin-bottom:5mm; overflow:hidden; page-break-inside:avoid; }
+.vuln-head { padding:3.5mm 4mm; display:flex; align-items:flex-start; gap:3mm; }
+.vh-critical { background:#fff5f5; border-left:4pt solid #dc2626; }
+.vh-high     { background:#fff8f1; border-left:4pt solid #ea580c; }
+.vh-medium   { background:#fffdf0; border-left:4pt solid #d97706; }
+.vh-low      { background:#f0f7ff; border-left:4pt solid #3b82f6; }
+.vh-info     { background:#f9fafb; border-left:4pt solid #9ca3af; }
+.vuln-badge  { font-size:7pt; font-weight:bold; text-transform:uppercase; letter-spacing:0.5pt; padding:1mm 2.5mm; border-radius:1.5mm; white-space:nowrap; flex-shrink:0; margin-top:0.5pt; }
+.b-critical { background:#dc2626; color:white; }
+.b-high     { background:#ea580c; color:white; }
+.b-medium   { background:#d97706; color:white; }
+.b-low      { background:#3b82f6; color:white; }
+.b-info     { background:#9ca3af; color:white; }
+.vuln-title-area { flex:1; }
+.vuln-title    { font-size:10.5pt; font-weight:bold; color:#111827; }
+.vuln-category { font-size:8pt; color:#9ca3af; margin-top:0.5mm; }
+.vuln-cvss     { font-size:10pt; font-weight:bold; color:#6b7280; flex-shrink:0; background:#f3f4f6; border:1pt solid #e5e7eb; border-radius:2mm; padding:1mm 2.5mm; white-space:nowrap; }
+.vuln-body     { padding:4mm; border-top:1pt solid #f3f4f6; }
+.vlbl  { font-size:7pt; font-weight:bold; text-transform:uppercase; letter-spacing:0.5pt; color:#9ca3af; margin-bottom:1mm; margin-top:3.5mm; }
+.vlbl:first-child { margin-top:0; }
+.vtxt  { font-size:9pt; color:#374151; line-height:1.6; }
+.vevid { font-family:"Courier New",monospace; font-size:8pt; color:#4b5563; background:#f3f4f6; padding:2.5mm; border-radius:2mm; word-break:break-all; }
+.vremed{ background:#f0fdf4; border-left:3pt solid #22c55e; padding:3mm 3.5mm; border-radius:0 2mm 2mm 0; font-size:9pt; color:#166534; line-height:1.6; }
 
-    /* ─── ATT&CK badges ─── */
-    .attack-tag { display: inline-block; font-size: 7pt; font-weight: 700; padding: 2px 7px; border-radius: 4px; background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; margin: 2px 2px 0 0; }
+/* ================================================================ TABLES */
+table { width:100%; border-collapse:collapse; margin-bottom:5mm; font-size:9pt; }
+th { background:#f3f4f6; font-weight:bold; text-align:left; padding:2.5mm 3mm; border:1pt solid #e5e7eb; font-size:7.5pt; text-transform:uppercase; letter-spacing:0.5pt; color:#6b7280; }
+td { padding:2.5mm 3mm; border:1pt solid #e5e7eb; vertical-align:top; }
+tr:nth-child(even) td { background:#fafafa; }
 
-    /* ─── Attack paths ─── */
-    .attack-path { border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 16px; overflow: hidden; }
-    .attack-path-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
-    .attack-path-header h3 { font-size: 11pt; font-weight: 700; color: #1e293b; }
-    .attack-path-body { padding: 14px 16px; }
-    .attack-path-meta { font-size: 8.5pt; color: #64748b; margin-bottom: 10px; }
-    .steps-list { list-style: none; counter-reset: steps; }
-    .steps-list li { counter-increment: steps; display: flex; gap: 10px; margin-bottom: 8px; font-size: 9.5pt; color: #334155; }
-    .steps-list li::before {
-      content: counter(steps);
-      min-width: 20px; height: 20px;
-      background: #e0e7ff; color: #4f46e5;
-      border-radius: 50%; font-weight: 700; font-size: 8pt;
-      display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0; margin-top: 1px;
-    }
-    .impact-box { background: #fef2f2; border: 1px solid #fca5a5; border-radius: 6px; padding: 8px 12px; margin-top: 10px; font-size: 9pt; color: #7f1d1d; }
-    .mitre-box { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 6px; padding: 8px 12px; margin-top: 10px; font-size: 8.5pt; color: #7c2d12; }
+/* ================================================================ COMPLIANCE */
+.fw-block  { border:1pt solid #e5e7eb; border-radius:3mm; margin-bottom:5mm; overflow:hidden; page-break-inside:avoid; }
+.fw-header { padding:4mm 5mm; display:flex; align-items:center; gap:4mm; border-bottom:1pt solid #e5e7eb; }
+.fw-grade-box { width:14mm; height:14mm; border-radius:3mm; display:flex; align-items:center; justify-content:center; font-size:20pt; font-weight:900; flex-shrink:0; color:white; }
+.fw-meta   { flex:1; }
+.fw-name   { font-size:11pt; font-weight:bold; color:#111827; }
+.fw-ver    { font-size:8.5pt; color:#9ca3af; }
+.fw-stmt   { font-size:8.5pt; color:#6b7280; margin-top:0.5mm; }
+.fw-score  { font-size:22pt; font-weight:900; flex-shrink:0; }
+.fw-ctrl-row { padding:2.5mm 5mm; display:flex; align-items:center; gap:3mm; border-bottom:0.5pt solid #f3f4f6; }
+.fw-ctrl-row:last-child { border-bottom:none; }
+.dot { width:5mm; height:5mm; border-radius:50%; flex-shrink:0; }
+.dot-pass    { background:#22c55e; }
+.dot-fail    { background:#ef4444; }
+.dot-partial { background:#f59e0b; }
+.dot-na      { background:#d1d5db; }
+.ctrl-id    { font-size:7.5pt; font-family:"Courier New",monospace; color:#9ca3af; width:22mm; flex-shrink:0; }
+.ctrl-title { flex:1; font-size:8.5pt; color:#374151; }
+.ctrl-score { font-size:8.5pt; font-weight:bold; width:12mm; text-align:right; flex-shrink:0; }
+.ctrl-lbl   { font-size:7pt; font-weight:bold; padding:0.5mm 2mm; border-radius:1mm; flex-shrink:0; white-space:nowrap; }
+.lbl-pass    { background:#dcfce7; color:#166534; }
+.lbl-fail    { background:#fee2e2; color:#991b1b; }
+.lbl-partial { background:#fef3c7; color:#92400e; }
+.lbl-na      { background:#f3f4f6; color:#6b7280; }
 
-    /* ─── Priorities ─── */
-    .priority-item { display: flex; gap: 14px; align-items: flex-start; padding: 14px 0; border-bottom: 1px solid #f1f5f9; }
-    .priority-item:last-child { border-bottom: none; }
-    .priority-num { min-width: 28px; height: 28px; border-radius: 50%; background: #f97316; color: #fff; font-weight: 800; font-size: 11pt; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    .priority-content h4 { font-size: 10.5pt; font-weight: 700; color: #1e293b; margin-bottom: 3px; }
-    .priority-content p { font-size: 9pt; color: #64748b; margin-bottom: 6px; }
-    .priority-tags { display: flex; gap: 8px; flex-wrap: wrap; }
-    .priority-tag { font-size: 8pt; padding: 2px 8px; border-radius: 4px; font-weight: 600; }
-    .priority-tag.effort { background: #f1f5f9; color: #475569; }
-    .priority-tag.impact { background: #dcfce7; color: #166534; }
+/* ================================================================ CTI */
+.cti-grid { display:flex; gap:3mm; margin-bottom:4mm; }
+.cti-card  { flex:1; border:1pt solid #e5e7eb; border-radius:3mm; padding:3.5mm; }
+.cti-card-title { font-size:7pt; font-weight:bold; text-transform:uppercase; letter-spacing:0.5pt; color:#9ca3af; margin-bottom:1.5mm; }
+.cti-value { font-size:9.5pt; font-weight:bold; color:#111827; }
+.cti-sub   { font-size:8pt; color:#6b7280; margin-top:0.5mm; }
+.dnsbl-hit   { color:#dc2626; font-weight:bold; }
+.dnsbl-clean { color:#16a34a; }
+.info-row { display:flex; justify-content:space-between; padding:2mm 0; border-bottom:0.5pt solid #f3f4f6; }
+.info-row:last-child { border-bottom:none; }
+.ir-key { font-size:8.5pt; color:#6b7280; }
+.ir-val { font-size:8.5pt; font-weight:bold; color:#111827; }
 
-    /* ─── Quick wins ─── */
-    .quick-win-list { list-style: none; }
-    .quick-win-list li { display: flex; gap: 8px; align-items: flex-start; padding: 6px 0; font-size: 9.5pt; color: #334155; }
-    .quick-win-list li::before { content: "✓"; color: #16a34a; font-weight: 800; flex-shrink: 0; margin-top: 1px; }
+/* ================================================================ SUBDOMAIN */
+.status-2xx { color:#16a34a; font-weight:bold; }
+.status-3xx { color:#2563eb; font-weight:bold; }
+.status-4xx { color:#d97706; font-weight:bold; }
+.status-5xx { color:#dc2626; font-weight:bold; }
+.to-badge  { background:#dc2626; color:white; font-size:6.5pt; font-weight:bold; padding:0.5mm 1.5mm; border-radius:1mm; text-transform:uppercase; }
+.src-badge { font-size:7pt; padding:0.5mm 2mm; border-radius:1mm; font-weight:bold; }
+.src-crtsh        { background:#eef2ff; color:#4f46e5; }
+.src-hackertarget { background:#ecfdf5; color:#065f46; }
+.src-bruteforce   { background:#f3f4f6; color:#6b7280; }
+.src-dns_records  { background:#fffbeb; color:#92400e; }
 
-    /* ─── Footer ─── */
-    .report-footer { border-top: 1px solid #e2e8f0; padding-top: 12px; margin-top: 40px; display: flex; justify-content: space-between; font-size: 8pt; color: #94a3b8; }
+/* ================================================================ REMEDIATION */
+.prio-card { display:flex; gap:3mm; margin-bottom:4mm; border:1pt solid #e5e7eb; border-radius:3mm; padding:4mm; page-break-inside:avoid; }
+.prio-num  { background:#f97316; color:white; width:8mm; height:8mm; border-radius:2mm; font-weight:900; font-size:11pt; text-align:center; line-height:8mm; flex-shrink:0; }
+.prio-action { font-size:10pt; font-weight:bold; color:#111827; margin-bottom:1mm; }
+.prio-reason { font-size:8.5pt; color:#6b7280; margin-bottom:2mm; }
+.prio-meta   { font-size:8pt; color:#9ca3af; }
+.prio-meta span { color:#374151; font-weight:bold; }
+.qw-row  { display:flex; gap:2.5mm; padding:2mm 0; border-bottom:0.5pt solid #f3f4f6; page-break-inside:avoid; }
+.qw-row:last-child { border-bottom:none; }
+.qw-num  { background:#4f46e5; color:white; width:5mm; height:5mm; border-radius:50%; font-size:7pt; font-weight:bold; text-align:center; line-height:5mm; flex-shrink:0; margin-top:1pt; }
+.qw-text { font-size:9pt; color:#374151; flex:1; }
+.ap-card  { border:1pt solid #e5e7eb; border-radius:3mm; padding:4mm; margin-bottom:4mm; page-break-inside:avoid; }
+.ap-title { font-size:10pt; font-weight:bold; color:#111827; margin-bottom:2mm; }
+.ap-step  { display:flex; gap:2mm; font-size:8.5pt; color:#374151; margin-bottom:1.5mm; }
+.ap-arrow { color:#9ca3af; flex-shrink:0; }
 
-    /* ─── Print button (screen only) ─── */
-    .print-bar { position: fixed; top: 0; left: 0; right: 0; background: #4f46e5; color: #fff; padding: 10px 24px; display: flex; align-items: center; justify-content: space-between; z-index: 100; font-size: 10pt; font-weight: 600; }
-    .print-bar button { background: #fff; color: #4f46e5; border: none; padding: 7px 20px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 10pt; }
-    @media screen { body { padding-top: 56px; } }
-    @media print  { .print-bar { display: none; } body { padding-top: 0; } }
-  </style>
+/* ================================================================ FOOTER */
+.conf-footer { margin-top:12mm; text-align:center; padding:3mm; background:#f9fafb; border:1pt solid #e5e7eb; border-radius:2mm; font-size:8pt; color:#9ca3af; }
+
+/* callout boxes */
+.callout { padding:4mm 5mm; border-radius:3mm; margin-bottom:5mm; }
+.callout-err  { background:#fef2f2; border:1pt solid #fecaca; }
+.callout-warn { background:#fffbeb; border:1pt solid #fde68a; }
+.callout-ok   { background:#f0fdf4; border:1pt solid #bbf7d0; }
+
+</style>
 </head>
 <body>
 
-<!-- Barre d'impression (écran seulement) -->
-<div class="print-bar no-print">
-  <span>Rapport de sécurité — {{ scan.target }}</span>
-  <button onclick="window.print()">⬇ Télécharger en PDF</button>
-</div>
+{# ================================================================
+   COVER PAGE
+   ================================================================ #}
+<div class="cover">
+  <div class="cover-brand">SuturaSec</div>
+  <div class="cover-brand-sub">Security as a Service</div>
+  <div class="cover-rep-title">Rapport de Sécurité</div>
+  <div class="cover-rep-type">{{ scan_type_label | upper }}</div>
+  <div class="cover-divider"></div>
+  <div class="cover-target">{{ scan.target }}</div>
+  <div class="cover-meta-line">Type : {{ scan_type_label }}</div>
+  <div class="cover-meta-line">Réalisé le : {{ scan.completed_at | fmt_date }}</div>
+  <div class="cover-meta-line">Rapport généré le : {{ generated_at }}</div>
 
-<!-- ════════════ COUVERTURE ════════════ -->
-<div class="sheet cover">
-  <div class="cover-brand">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-    SuturaSec
+  {% if scan.risk_score is not none %}
+  <div class="cover-risk-block">
+    <div class="cover-risk-lbl">Score de Risque Global</div>
+    <div class="cover-score-line">
+      <div class="cover-score-num
+        {%- if scan.risk_score >= 8 %} col-critical
+        {%- elif scan.risk_score >= 6 %} col-high
+        {%- elif scan.risk_score >= 4 %} col-medium
+        {%- else %} col-low{%- endif %}">{{ "%.1f"|format(scan.risk_score) }}</div>
+      <div class="cover-score-den">/ 10</div>
+    </div>
+    <div class="cover-risk-lvl
+      {%- if scan.risk_score >= 8 %} col-critical
+      {%- elif scan.risk_score >= 6 %} col-high
+      {%- elif scan.risk_score >= 4 %} col-medium
+      {%- else %} col-low{%- endif %}">{{ risk_label }}</div>
   </div>
+  {% endif %}
 
-  <div class="cover-main">
-    <span class="cover-badge">Rapport d'analyse de sécurité</span>
-    <div class="cover-title">Security Assessment<br>Report</div>
-    <div class="cover-target">{{ scan.target }}</div>
-
-    <div class="cover-meta">
-      <div class="cover-meta-item">
-        <label>Type d'analyse</label>
-        <span>{{ "Application Web" if scan.scan_type == "web" else "Réseau" }}</span>
-      </div>
-      <div class="cover-meta-item">
-        <label>Date</label>
-        <span>{{ scan.created_at.strftime("%d/%m/%Y") }}</span>
-      </div>
-      <div class="cover-meta-item">
-        <label>Statut</label>
-        <span>Terminé</span>
-      </div>
-      <div class="cover-meta-item">
-        <label>Vulnérabilités</label>
-        <span>{{ vulnerabilities|length }}</span>
-      </div>
-    </div>
-
-    {% if scan.risk_score is not none %}
-    {% set risk_class = "critical" if scan.risk_score >= 7 else ("high" if scan.risk_score >= 5 else ("medium" if scan.risk_score >= 3 else "low")) %}
-    {% set risk_label = "CRITIQUE" if scan.risk_score >= 7 else ("ÉLEVÉ" if scan.risk_score >= 5 else ("MODÉRÉ" if scan.risk_score >= 3 else "FAIBLE")) %}
-    <div class="cover-risk-block {{ risk_class }}" style="margin-top:36px;">
-      <div>
-        <div class="cover-risk-score">{{ "%.1f"|format(scan.risk_score) }}</div>
-        <div style="font-size:8pt;color:#64748b;margin-top:2px;">/ 10</div>
-      </div>
-      <div>
-        <div class="cover-risk-label" style="color:inherit;">Niveau de risque</div>
-        <div style="font-size:14pt;font-weight:900;margin-top:2px;">{{ risk_label }}</div>
-      </div>
-    </div>
+  {% set total_sev = sev_counts.critical + sev_counts.high + sev_counts.medium + sev_counts.low %}
+  {% if total_sev > 0 %}
+  <div class="cover-stats-row">
+    {% if sev_counts.critical > 0 %}<div><div class="cover-stat-num col-critical">{{ sev_counts.critical }}</div><div class="cover-stat-lbl">Critique{{ 's' if sev_counts.critical > 1 }}</div></div>{% endif %}
+    {% if sev_counts.high > 0 %}<div><div class="cover-stat-num col-high">{{ sev_counts.high }}</div><div class="cover-stat-lbl">Élevé{{ 's' if sev_counts.high > 1 }}</div></div>{% endif %}
+    {% if sev_counts.medium > 0 %}<div><div class="cover-stat-num col-medium">{{ sev_counts.medium }}</div><div class="cover-stat-lbl">Moyen{{ 's' if sev_counts.medium > 1 }}</div></div>{% endif %}
+    {% if sev_counts.low > 0 %}<div><div class="cover-stat-num col-low">{{ sev_counts.low }}</div><div class="cover-stat-lbl">Faible{{ 's' if sev_counts.low > 1 }}</div></div>{% endif %}
+  </div>
+  {% elif scan.scan_type == 'subdomain' and subdomain %}
+  <div class="cover-stats-row">
+    <div><div class="cover-stat-num" style="color:#a5b4fc">{{ subdomain.total_found }}</div><div class="cover-stat-lbl">Sous-domaines</div></div>
+    {% if subdomain.summary %}
+    <div><div class="cover-stat-num col-low">{{ subdomain.summary.active_http or 0 }}</div><div class="cover-stat-lbl">Actifs HTTP</div></div>
+    <div><div class="cover-stat-num {% if subdomain.summary.takeover_risks > 0 %}col-critical{% else %}col-low{% endif %}">{{ subdomain.summary.takeover_risks or 0 }}</div><div class="cover-stat-lbl">Takeover</div></div>
     {% endif %}
   </div>
+  {% endif %}
 
-  <div class="cover-footer">
-    <span>Généré par SuturaSec · Security as a Service</span>
-    <span>{{ scan.created_at.strftime("%d %B %Y à %H:%M") }}</span>
-  </div>
+  <div class="cover-footer">Document confidentiel — SuturaSec {{ generated_at[:4] }}</div>
 </div>
 
-<!-- ════════════ RÉSUMÉ EXÉCUTIF ════════════ -->
-<div class="sheet page-break">
-  <div class="section-title">1. Résumé Exécutif</div>
 
-  <!-- Stats -->
-  {% set cnt_crit = vulnerabilities|selectattr("severity","eq","critical")|list|length %}
-  {% set cnt_high = vulnerabilities|selectattr("severity","eq","high")|list|length %}
-  {% set cnt_med  = vulnerabilities|selectattr("severity","eq","medium")|list|length %}
-  {% set cnt_low  = vulnerabilities|selectattr("severity","eq","low")|list|length %}
-
-  <div class="stats-grid">
-    <div class="stat-card risk">
-      <label>Score risque</label>
-      <span>{{ "%.1f"|format(scan.risk_score) if scan.risk_score is not none else "—" }}</span>
+{# ================================================================
+   01 — RÉSUMÉ EXÉCUTIF
+   ================================================================ #}
+<div class="section">
+  <div class="section-header">
+    <div class="section-num">01</div>
+    <div>
+      <div class="section-title">Résumé Exécutif</div>
+      <div class="section-desc">Synthèse de l'analyse et principaux enseignements</div>
     </div>
-    <div class="stat-card critical"><label>Critique</label><span>{{ cnt_crit }}</span></div>
-    <div class="stat-card high">   <label>Élevé</label>  <span>{{ cnt_high }}</span></div>
-    <div class="stat-card medium"> <label>Moyen</label>  <span>{{ cnt_med }}</span></div>
-    <div class="stat-card low">    <label>Faible</label> <span>{{ cnt_low }}</span></div>
+  </div>
+
+  <div class="no-break" style="margin-bottom:6mm;">
+    <table>
+      <tr><th style="width:38%">Paramètre</th><th>Valeur</th></tr>
+      <tr><td>Cible analysée</td><td><strong>{{ scan.target }}</strong></td></tr>
+      <tr><td>Type d'analyse</td><td>{{ scan_type_label }}</td></tr>
+      <tr><td>Date de lancement</td><td>{{ scan.created_at | fmt_date }}</td></tr>
+      <tr><td>Date de fin</td><td>{{ scan.completed_at | fmt_date }}</td></tr>
+      <tr>
+        <td>Score de risque</td>
+        <td>{% if scan.risk_score is not none %}<strong>{{ "%.1f"|format(scan.risk_score) }} / 10 — {{ risk_label }}</strong>{% else %}—{% endif %}</td>
+      </tr>
+      <tr>
+        <td>Vulnérabilités</td>
+        <td>{{ vulnerabilities|length }} au total
+          {%- if sev_counts.critical > 0 %} · <strong style="color:#dc2626">{{ sev_counts.critical }} critique{{ 's' if sev_counts.critical > 1 }}</strong>{%- endif %}
+          {%- if sev_counts.high > 0 %} · <strong style="color:#ea580c">{{ sev_counts.high }} élevé{{ 's' if sev_counts.high > 1 }}</strong>{%- endif %}
+          {%- if sev_counts.medium > 0 %} · {{ sev_counts.medium }} moyen{%- endif %}
+          {%- if sev_counts.low > 0 %} · {{ sev_counts.low }} faible{%- endif %}
+        </td>
+      </tr>
+      {% if compliance %}
+      <tr><td>Score de conformité</td><td><strong>{{ "%.0f"|format(compliance.global_score) }}/100 — Note {{ compliance.global_grade }}</strong></td></tr>
+      {% endif %}
+      {% if subdomain %}
+      <tr><td>Sous-domaines découverts</td><td><strong>{{ subdomain.total_found }}</strong> ({{ subdomain.summary.active_http or 0 }} actifs HTTP, {{ subdomain.summary.takeover_risks or 0 }} risques takeover)</td></tr>
+      {% endif %}
+    </table>
   </div>
 
   {% if scan.summary %}
-  <div class="summary-box">
-    <p>{{ scan.summary }}</p>
+  <div class="sum-box no-break">
+    <div class="sum-box-lbl">Analyse IA — Résumé Exécutif</div>
+    <div class="sum-box-txt">{{ scan.summary }}</div>
   </div>
   {% endif %}
 
-  {% if ai.risk_narrative %}
-  <div class="section-subtitle">Analyse de risque</div>
-  <div class="summary-box warning">
-    <p>{{ ai.risk_narrative }}</p>
+  {% if attack_paths.risk_narrative %}
+  <div class="sum-box sum-box-warn no-break">
+    <div class="sum-box-lbl sum-lbl-warn">Analyse de Risque</div>
+    <div class="sum-box-txt">{{ attack_paths.risk_narrative }}</div>
   </div>
   {% endif %}
 
-  {% if ai.quick_wins %}
-  <div class="section-subtitle">Actions rapides recommandées</div>
-  <ul class="quick-win-list">
-    {% for win in ai.quick_wins %}
-    <li>{{ win }}</li>
+  {% if attack_paths.quick_wins %}
+  <div class="no-break">
+    <h3>Actions Rapides (Quick Wins)</h3>
+    {% for win in attack_paths.quick_wins %}
+    <div class="qw-row"><div class="qw-num">{{ loop.index }}</div><div class="qw-text">{{ win }}</div></div>
     {% endfor %}
-  </ul>
+  </div>
   {% endif %}
 </div>
 
-<!-- ════════════ VULNÉRABILITÉS ════════════ -->
-<div class="sheet page-break">
-  <div class="section-title">2. Vulnérabilités Détectées</div>
 
-  {% if vulnerabilities %}
-  <table>
-    <thead>
-      <tr>
-        <th style="width:40%">Titre</th>
-        <th style="width:12%">Sévérité</th>
-        <th style="width:10%">CVSS</th>
-        <th style="width:38%">Remédiation</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for v in vulnerabilities %}
-      <tr>
-        <td>
-          <div class="vuln-title">{{ v.title }}</div>
-          {% if v.category %}<div class="vuln-cat">{{ v.category }}</div>{% endif %}
-          {% if v.description %}<div class="vuln-rem" style="color:#334155;font-style:normal;">{{ v.description[:120] }}{% if v.description|length > 120 %}…{% endif %}</div>{% endif %}
-          {% if v.evidence %}<div class="vuln-rem">{{ v.evidence[:100] }}{% if v.evidence|length > 100 %}…{% endif %}</div>{% endif %}
-          {% if v.attack_techniques %}
-          <div style="margin-top:5px;">
-            {% for tech in v.attack_techniques %}
-            <span class="attack-tag">{{ tech.id }} · {{ tech.tactic }}</span>
-            {% endfor %}
-          </div>
-          {% endif %}
-        </td>
-        <td><span class="badge {{ v.severity }}">{{ {"critical":"Critique","high":"Élevé","medium":"Moyen","low":"Faible","info":"Info"}.get(v.severity, v.severity) }}</span></td>
-        <td style="font-weight:700;color:#1e293b;">{{ "%.1f"|format(v.cvss_score) if v.cvss_score is not none else "—" }}</td>
-        <td><span class="vuln-rem" style="font-style:normal;">{{ v.remediation or "—" }}</span></td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <p style="color:#64748b;text-align:center;padding:32px;">Aucune vulnérabilité détectée.</p>
-  {% endif %}
-</div>
-
-<!-- ════════════ CHEMINS D'ATTAQUE ════════════ -->
-{% if ai.attack_paths %}
-<div class="sheet page-break">
-  <div class="section-title">3. Chemins d'Attaque Modélisés</div>
-  <p style="color:#64748b;font-size:9.5pt;margin-bottom:20px;">
-    Cette section modélise comment un attaquant réel pourrait enchaîner les vulnérabilités détectées pour compromettre la cible.
-  </p>
-
-  {% for ap in ai.attack_paths %}
-  {% set ap_class = ap.severity if ap.severity in ["critical","high","medium","low"] else "low" %}
-  <div class="attack-path">
-    <div class="attack-path-header">
-      <h3>{{ ap.name }}</h3>
-      <span class="badge {{ ap_class }}">{{ {"critical":"Critique","high":"Élevé","medium":"Moyen","low":"Faible"}.get(ap.severity, ap.severity) }}</span>
+{# ================================================================
+   02 — VULNÉRABILITÉS
+   ================================================================ #}
+{% if vulnerabilities %}
+<div class="section">
+  <div class="section-header">
+    <div class="section-num">02</div>
+    <div>
+      <div class="section-title">Vulnérabilités Détectées</div>
+      <div class="section-desc">{{ vulnerabilities|length }} finding{{ 's' if vulnerabilities|length > 1 }} — classés par criticité décroissante</div>
     </div>
-    <div class="attack-path-body">
-      <div class="attack-path-meta">
-        <strong>Probabilité :</strong> {{ ap.probability | capitalize }} &nbsp;·&nbsp;
-        <strong>Prérequis :</strong> {{ ap.prerequisites or "Aucun prérequis particulier" }}
+  </div>
+
+  <div class="stats-grid no-break">
+    <div class="stat-card card-critical"><div class="stat-label">Critique</div><div class="stat-value val-critical">{{ sev_counts.critical }}</div></div>
+    <div class="stat-card card-high"><div class="stat-label">Élevé</div><div class="stat-value val-high">{{ sev_counts.high }}</div></div>
+    <div class="stat-card card-medium"><div class="stat-label">Moyen</div><div class="stat-value val-medium">{{ sev_counts.medium }}</div></div>
+    <div class="stat-card card-low"><div class="stat-label">Faible</div><div class="stat-value val-low">{{ sev_counts.low }}</div></div>
+    <div class="stat-card card-total"><div class="stat-label">Total</div><div class="stat-value val-total">{{ vulnerabilities|length }}</div></div>
+  </div>
+
+  {% for vuln in vulnerabilities %}
+  <div class="vuln-card">
+    <div class="vuln-head vh-{{ vuln.severity }}">
+      <div class="vuln-badge b-{{ vuln.severity }}">{{ vuln.severity | sev_label }}</div>
+      <div class="vuln-title-area">
+        <div class="vuln-title">{{ vuln.title }}</div>
+        {% if vuln.category %}<div class="vuln-category">{{ vuln.category }}</div>{% endif %}
       </div>
-      <ul class="steps-list">
-        {% for step in ap.steps %}
-        <li>{{ step }}</li>
-        {% endfor %}
-      </ul>
-      {% if ap.impact %}
-      <div class="impact-box"><strong>Impact si réussi :</strong> {{ ap.impact }}</div>
-      {% endif %}
-      {% if ap.mitre_techniques %}
-      <div class="mitre-box">
-        <strong>MITRE ATT&amp;CK :</strong>
-        {% for tech in ap.mitre_techniques %}
-        <span class="attack-tag">{{ tech }}</span>
-        {% endfor %}
-      </div>
-      {% endif %}
+      {% if vuln.cvss_score %}<div class="vuln-cvss">CVSS {{ "%.1f"|format(vuln.cvss_score) }}</div>{% endif %}
+    </div>
+    <div class="vuln-body">
+      {% if vuln.description %}<div class="vlbl">Description</div><div class="vtxt">{{ vuln.description }}</div>{% endif %}
+      {% if vuln.evidence %}<div class="vlbl">Preuve technique</div><div class="vevid">{{ vuln.evidence }}</div>{% endif %}
+      {% if vuln.remediation %}<div class="vlbl">Remédiation recommandée</div><div class="vremed">{{ vuln.remediation }}</div>{% endif %}
     </div>
   </div>
   {% endfor %}
 </div>
 {% endif %}
 
-<!-- ════════════ PRIORITÉS ════════════ -->
-{% if ai.top_priorities %}
-<div class="sheet page-break">
-  <div class="section-title">4. Plan de Remédiation Priorisé</div>
 
-  <div style="margin-bottom:24px;">
-    {% for p in ai.top_priorities %}
-    <div class="priority-item">
-      <div class="priority-num">{{ p.rank }}</div>
-      <div class="priority-content">
-        <h4>{{ p.action }}</h4>
-        <p>{{ p.reason }}</p>
-        <div class="priority-tags">
-          <span class="priority-tag effort">Effort : {{ p.effort }}</span>
-          <span class="priority-tag impact">{{ p.impact_if_fixed }}</span>
+{# ================================================================
+   03 — CONFORMITÉ
+   ================================================================ #}
+{% if compliance and scan.scan_type in ('web', 'network') %}
+<div class="section">
+  <div class="section-header">
+    <div class="section-num">03</div>
+    <div>
+      <div class="section-title">Rapport de Conformité</div>
+      <div class="section-desc">OWASP Top 10 · PCI-DSS v4.0 · ISO/IEC 27001:2022 · RGPD Art.32</div>
+    </div>
+  </div>
+
+  <div class="no-break" style="margin-bottom:6mm;border:1pt solid #c7d2fe;border-radius:3mm;padding:5mm;background:#f0f4ff;">
+    <div style="display:flex;align-items:center;gap:6mm;">
+      <div style="text-align:center;flex-shrink:0;">
+        <div style="font-size:7pt;font-weight:bold;text-transform:uppercase;letter-spacing:1pt;color:#6366f1;margin-bottom:1mm;">Score Global</div>
+        <div style="font-size:40pt;font-weight:900;line-height:1;color:{{ compliance.global_score | score_color }};">{{ "%.0f"|format(compliance.global_score) }}</div>
+        <div style="font-size:11pt;color:#9ca3af;">/100</div>
+      </div>
+      <div style="flex-shrink:0;text-align:center;">
+        <div style="font-size:48pt;font-weight:900;line-height:1;color:{{ compliance.global_grade | grade_color }};">{{ compliance.global_grade }}</div>
+      </div>
+      <div style="flex:1;">
+        <div style="font-size:9pt;color:#374151;margin-bottom:3mm;">{{ compliance.summary }}</div>
+        <div style="display:flex;gap:3mm;flex-wrap:wrap;">
+          {% for fw in compliance.frameworks %}
+          <div style="text-align:center;background:white;border:1pt solid #e5e7eb;border-radius:2mm;padding:2mm 3mm;min-width:22mm;">
+            <div style="font-size:7pt;color:#9ca3af;margin-bottom:1mm;">{{ fw.framework }}</div>
+            <div style="font-size:12pt;font-weight:900;color:{{ fw.grade | grade_color }};">{{ fw.grade }}</div>
+            <div style="font-size:8pt;color:#6b7280;">{{ "%.0f"|format(fw.overall_score) }}/100</div>
+          </div>
+          {% endfor %}
         </div>
       </div>
     </div>
-    {% endfor %}
   </div>
 
-  <div class="report-footer">
-    <span>SuturaSec — Security as a Service</span>
-    <span>Rapport généré le {{ scan.created_at.strftime("%d/%m/%Y à %H:%M") }} · Confidentiel</span>
+  {% for fw in compliance.frameworks %}
+  <div class="fw-block no-break">
+    <div class="fw-header">
+      <div class="fw-grade-box" style="background:{{ fw.grade | grade_color }};">{{ fw.grade }}</div>
+      <div class="fw-meta">
+        <div class="fw-name">{{ fw.framework }} {{ fw.version }}</div>
+        <div class="fw-ver">{{ fw.passed }} conformes · {{ fw.failed }} non-conformes{% if fw.partial > 0 %} · {{ fw.partial }} partiels{% endif %}</div>
+        <div class="fw-stmt">{{ fw.compliance_statement }}</div>
+      </div>
+      <div class="fw-score" style="color:{{ fw.overall_score | score_color }};">{{ "%.0f"|format(fw.overall_score) }}/100</div>
+    </div>
+    {% for ctrl in fw.controls %}
+    <div class="fw-ctrl-row">
+      <div class="dot dot-{{ ctrl.status }}"></div>
+      <div class="ctrl-id">{{ ctrl.id }}</div>
+      <div class="ctrl-title">{{ ctrl.title }}</div>
+      <div class="ctrl-lbl lbl-{{ ctrl.status }}">{{ {'pass':'CONFORME','fail':'NON CONF.','partial':'PARTIEL','na':'N/A'}[ctrl.status] or ctrl.status }}</div>
+      <div class="ctrl-score" style="color:{{ ctrl.score | score_color }};">{{ ctrl.score }}%</div>
+    </div>
+    {% endfor %}
   </div>
+  {% endfor %}
 </div>
 {% endif %}
+
+
+{# ================================================================
+   THREAT INTELLIGENCE (CTI)
+   ================================================================ #}
+{% if threat_intel and scan.scan_type == 'cti' %}
+{% set ti_sec = '03' if not (compliance and scan.scan_type in ('web','network')) else '04' %}
+<div class="section">
+  <div class="section-header">
+    <div class="section-num">{{ ti_sec }}</div>
+    <div>
+      <div class="section-title">Threat Intelligence</div>
+      <div class="section-desc">Réputation IP · Géolocalisation · DNSBL · Domain RDAP</div>
+    </div>
+  </div>
+
+  {% set tl = threat_intel %}
+  <div class="callout {% if tl.risk_level in ('critical','high') %}callout-err{% elif tl.risk_level == 'medium' %}callout-warn{% else %}callout-ok{% endif %} no-break" style="margin-bottom:5mm;">
+    <div style="display:flex;align-items:center;gap:5mm;">
+      <div style="text-align:center;flex-shrink:0;">
+        <div style="font-size:7pt;font-weight:bold;text-transform:uppercase;letter-spacing:1pt;color:#6b7280;margin-bottom:1mm;">Score de Menace</div>
+        <div style="font-size:32pt;font-weight:900;line-height:1;
+          {%- if tl.risk_level == 'critical' %}color:#dc2626;{%- elif tl.risk_level == 'high' %}color:#ea580c;{%- elif tl.risk_level == 'medium' %}color:#d97706;{%- else %}color:#16a34a;{%- endif %}">{{ tl.threat_score }}</div>
+        <div style="font-size:9pt;color:#9ca3af;">/10</div>
+      </div>
+      <div style="flex:1;">
+        <div style="font-size:11pt;font-weight:bold;margin-bottom:1mm;">Niveau : {{ {'critical':'Critique','high':'Élevé','medium':'Moyen','low':'Faible','info':'Info'}[tl.risk_level] or tl.risk_level }}</div>
+        <div style="font-size:8.5pt;color:#6b7280;">Domaine : <strong>{{ tl.domain }}</strong> · IP : <strong>{{ tl.ip or '—' }}</strong></div>
+      </div>
+    </div>
+  </div>
+
+  {% if tl.geolocation %}
+  <h3>Géolocalisation &amp; ASN</h3>
+  <div class="cti-grid no-break">
+    <div class="cti-card"><div class="cti-card-title">Pays</div><div class="cti-value">{{ tl.geolocation.country or '—' }}</div><div class="cti-sub">{{ tl.geolocation.country_code or '' }}</div></div>
+    <div class="cti-card"><div class="cti-card-title">Ville / Région</div><div class="cti-value">{{ tl.geolocation.city or '—' }}</div><div class="cti-sub">{{ tl.geolocation.region or '' }}</div></div>
+    <div class="cti-card"><div class="cti-card-title">ISP / ASN</div><div class="cti-value" style="font-size:8.5pt;">{{ tl.geolocation.isp or '—' }}</div><div class="cti-sub">{{ tl.geolocation.asn or '' }}</div></div>
+    <div class="cti-card"><div class="cti-card-title">Datacenter</div><div class="cti-value {% if tl.geolocation.is_hosting %}col-high{% else %}col-low{% endif %}">{{ 'Oui' if tl.geolocation.is_hosting else 'Non' }}</div></div>
+  </div>
+  {% endif %}
+
+  {% if tl.domain_info %}
+  <h3>Informations domaine (RDAP)</h3>
+  <div class="no-break">
+    {% if tl.domain_info.registrar %}<div class="info-row"><span class="ir-key">Registrar</span><span class="ir-val">{{ tl.domain_info.registrar }}</span></div>{% endif %}
+    {% if tl.domain_info.creation_date %}<div class="info-row"><span class="ir-key">Créé le</span><span class="ir-val">{{ tl.domain_info.creation_date }}</span></div>{% endif %}
+    {% if tl.domain_info.expiry_date %}<div class="info-row"><span class="ir-key">Expire le</span><span class="ir-val">{{ tl.domain_info.expiry_date }}</span></div>{% endif %}
+    {% if tl.domain_info.age_days is defined %}<div class="info-row"><span class="ir-key">Âge du domaine</span><span class="ir-val">{{ tl.domain_info.age_days }} jours</span></div>{% endif %}
+  </div>
+  {% endif %}
+
+  {% if tl.blacklists and tl.blacklists.hits %}
+  <h3>Blacklists DNSBL — {{ tl.blacklists.listed }} / {{ tl.blacklists.checked }} listes positives</h3>
+  <div class="no-break">
+    <table>
+      <tr><th>Liste DNSBL</th><th style="width:25%">Statut</th></tr>
+      {% for hit in tl.blacklists.hits %}
+      <tr>
+        <td>{{ hit.name }}</td>
+        <td>{% if hit.listed %}<span class="dnsbl-hit">BLACKLISTÉ</span>{% else %}<span class="dnsbl-clean">Propre</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
+
+  {% if tl.abuse and tl.abuse.confidence_score is defined %}
+  <h3>AbuseIPDB</h3>
+  <div class="no-break">
+    <div class="info-row"><span class="ir-key">Score d'abus</span><span class="ir-val">{{ tl.abuse.confidence_score }}%</span></div>
+    <div class="info-row"><span class="ir-key">Signalements</span><span class="ir-val">{{ tl.abuse.total_reports }}</span></div>
+    {% if tl.abuse.last_reported %}<div class="info-row"><span class="ir-key">Dernier rapport</span><span class="ir-val">{{ tl.abuse.last_reported }}</span></div>{% endif %}
+    {% if tl.abuse.is_tor %}<div class="info-row"><span class="ir-key">Nœud Tor</span><span class="ir-val col-high">Oui</span></div>{% endif %}
+  </div>
+  {% endif %}
+
+  {% if tl.dns_records %}
+  <h3>Enregistrements DNS</h3>
+  <div class="no-break">
+    <table>
+      <tr><th style="width:12%">Type</th><th>Valeur(s)</th></tr>
+      {% for rtype, rvals in tl.dns_records.items() %}
+      <tr><td><strong>{{ rtype }}</strong></td><td style="font-family:'Courier New',monospace;font-size:8.5pt;">{{ rvals | join(', ') }}</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+
+{# ================================================================
+   SUBDOMAIN ENUMERATION
+   ================================================================ #}
+{% if subdomain and scan.scan_type == 'subdomain' %}
+<div class="section">
+  <div class="section-header">
+    <div class="section-num">03</div>
+    <div>
+      <div class="section-title">Sous-domaines Découverts</div>
+      <div class="section-desc">Énumération multi-sources : crt.sh · HackerTarget · Brute-force · DNS records</div>
+    </div>
+  </div>
+
+  <div class="stats-grid no-break">
+    <div class="stat-card card-violet"><div class="stat-label">Total trouvés</div><div class="stat-value val-violet">{{ subdomain.total_found }}</div></div>
+    {% if subdomain.summary %}
+    <div class="stat-card card-green"><div class="stat-label">Actifs HTTP</div><div class="stat-value val-green">{{ subdomain.summary.active_http or 0 }}</div></div>
+    <div class="stat-card {% if subdomain.summary.takeover_risks > 0 %}card-critical{% endif %}"><div class="stat-label">Takeover Risks</div><div class="stat-value {% if subdomain.summary.takeover_risks > 0 %}val-critical{% else %}val-green{% endif %}">{{ subdomain.summary.takeover_risks or 0 }}</div></div>
+    <div class="stat-card {% if subdomain.summary.dev_exposed > 0 %}card-medium{% endif %}"><div class="stat-label">Dev Exposés</div><div class="stat-value {% if subdomain.summary.dev_exposed > 0 %}val-medium{% else %}val-green{% endif %}">{{ subdomain.summary.dev_exposed or 0 }}</div></div>
+    {% endif %}
+    <div class="stat-card {% if subdomain.zone_transfer_vulnerable %}card-critical{% else %}card-green{% endif %}"><div class="stat-label">Zone Transfer</div><div class="stat-value" style="font-size:12pt;padding-top:4mm;{% if subdomain.zone_transfer_vulnerable %}color:#dc2626;{% else %}color:#16a34a;{% endif %}">{{ 'VULN.' if subdomain.zone_transfer_vulnerable else 'Sécurisé' }}</div></div>
+  </div>
+
+  <div style="margin-bottom:5mm;font-size:8.5pt;color:#6b7280;">
+    Sources : <strong>crt.sh {{ subdomain.sources.crtsh or 0 }}</strong> · <strong>HackerTarget {{ subdomain.sources.hackertarget or 0 }}</strong> · <strong>Brute-force {{ subdomain.sources.bruteforce or 0 }}</strong> · <strong>DNS {{ subdomain.sources.dns_records or 0 }}</strong>
+    {% if subdomain.wildcard_detected %} · <strong style="color:#d97706;">Wildcard DNS détecté → {{ subdomain.wildcard_ips | join(', ') }}</strong>{% endif %}
+  </div>
+
+  {% set takeover_subs = subdomain.subdomains | selectattr('takeover_risk') | list %}
+  {% if takeover_subs %}
+  <h3 style="color:#dc2626;border-color:#fca5a5;">Risques Subdomain Takeover ({{ takeover_subs|length }})</h3>
+  <div class="no-break">
+    <table>
+      <tr><th>Sous-domaine</th><th>CNAME</th><th>Service</th></tr>
+      {% for sub in takeover_subs %}
+      <tr>
+        <td style="font-family:'Courier New',monospace;font-size:8.5pt;">{{ sub.subdomain }}</td>
+        <td style="font-family:'Courier New',monospace;font-size:8pt;">{{ sub.cname or '—' }}</td>
+        <td><span class="to-badge">{{ sub.takeover_service or '?' }}</span></td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
+
+  {% set active_subs = subdomain.subdomains | selectattr('status_code', 'ne', none) | list %}
+  {% if active_subs %}
+  <h3>Sous-domaines Actifs ({{ active_subs|length }} / {{ subdomain.total_found }})</h3>
+  <table>
+    <tr><th>Sous-domaine</th><th style="width:10%">HTTP</th><th style="width:22%">Titre</th><th style="width:14%">Source</th></tr>
+    {% for sub in active_subs[:80] %}
+    <tr>
+      <td style="font-family:'Courier New',monospace;font-size:8pt;">{{ sub.subdomain }}{% if sub.takeover_risk %} <span class="to-badge">TAKE.</span>{% endif %}</td>
+      <td class="{{ sub.status_code | status_class }}">{% if sub.https %}🔒 {% endif %}{{ sub.status_code }}</td>
+      <td style="font-size:8pt;">{{ (sub.title or '')[:45] }}{% if sub.title and sub.title|length > 45 %}…{% endif %}</td>
+      <td><span class="src-badge src-{{ sub.source }}">{{ {'crt.sh':'crt.sh','hackertarget':'HT','bruteforce':'brute','dns_records':'DNS'}[sub.source] or sub.source }}</span></td>
+    </tr>
+    {% endfor %}
+    {% if active_subs|length > 80 %}
+    <tr><td colspan="4" style="text-align:center;color:#9ca3af;font-style:italic;">… {{ active_subs|length - 80 }} entrées supplémentaires non affichées</td></tr>
+    {% endif %}
+  </table>
+  {% endif %}
+</div>
+{% endif %}
+
+
+{# ================================================================
+   CHEMINS D'ATTAQUE & REMÉDIATION
+   ================================================================ #}
+{% if attack_paths.attack_paths or attack_paths.top_priorities %}
+<div class="section">
+  <div class="section-header">
+    <div class="section-num">0+</div>
+    <div>
+      <div class="section-title">Chemins d'Attaque &amp; Plan de Remédiation</div>
+      <div class="section-desc">Scénarios d'exploitation identifiés par l'IA et actions prioritaires</div>
+    </div>
+  </div>
+
+  {% if attack_paths.attack_paths %}
+  <h3>Scénarios d'Attaque</h3>
+  {% for ap in attack_paths.attack_paths %}
+  <div class="ap-card">
+    <div class="ap-title">{{ ap.title or ap.scenario or ('Scénario ' ~ loop.index) }}</div>
+    {% if ap.steps %}
+    {% for step in ap.steps %}<div class="ap-step"><span class="ap-arrow">→</span><span>{{ step }}</span></div>{% endfor %}
+    {% elif ap.description %}
+    <div style="font-size:9pt;color:#374151;">{{ ap.description }}</div>
+    {% endif %}
+    {% if ap.impact %}<div style="margin-top:2mm;font-size:8.5pt;color:#ea580c;"><strong>Impact :</strong> {{ ap.impact }}</div>{% endif %}
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% if attack_paths.top_priorities %}
+  <h3>Plan de Remédiation Priorisé</h3>
+  {% for p in attack_paths.top_priorities %}
+  <div class="prio-card">
+    <div class="prio-num">{{ p.rank or loop.index }}</div>
+    <div style="flex:1;">
+      <div class="prio-action">{{ p.action }}</div>
+      <div class="prio-reason">{{ p.reason }}</div>
+      <div class="prio-meta">Effort : <span>{{ p.effort or '—' }}</span> &nbsp;·&nbsp; Impact attendu : <span>{{ p.impact_if_fixed or '—' }}</span></div>
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
+</div>
+{% endif %}
+
+
+{# Confidential footer #}
+<div class="conf-footer">
+  Ce rapport a été généré automatiquement par <strong>SuturaSec</strong> le {{ generated_at }}.
+  Il contient des informations confidentielles destinées exclusivement au destinataire désigné.
+  Toute divulgation ou reproduction sans autorisation est interdite.
+</div>
 
 </body>
 </html>

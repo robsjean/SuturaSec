@@ -1,7 +1,9 @@
+import re
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi.responses import Response as FastAPIResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -179,3 +181,53 @@ def delete_scan(scan_id: int, db: Session = Depends(get_db), current_user: User 
         raise HTTPException(status_code=404, detail="Scan introuvable")
     db.delete(scan)
     db.commit()
+
+
+@router.get("/{scan_id}/report")
+def get_scan_report(
+    scan_id: int,
+    token: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Génère et retourne le rapport PDF d'un scan terminé.
+
+    Accepte le token JWT en query param pour permettre l'ouverture
+    dans un nouvel onglet via window.open().
+    """
+    from app.core.security import decode_token
+    from app.services.pdf_report import generate_pdf_report
+
+    # --- Auth via query param (pour window.open) ---
+    if not token:
+        raise HTTPException(status_code=401, detail="Token requis")
+
+    payload = decode_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Token invalide ou expiré")
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Token invalide")
+
+    user = db.query(User).filter(User.id == int(user_id)).first()
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="Utilisateur invalide")
+
+    # --- Récupération du scan ---
+    scan = db.query(Scan).filter(Scan.id == scan_id, Scan.user_id == user.id).first()
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan introuvable")
+    if scan.status != "completed":
+        raise HTTPException(status_code=400, detail="Le rapport n'est disponible que pour les scans terminés")
+
+    # --- Génération PDF ---
+    pdf_bytes = generate_pdf_report(scan)
+
+    target_clean = re.sub(r"[^a-z0-9.-]", "-", scan.target.lower())[:40]
+    filename = f"suturasec-{scan.scan_type}-{target_clean}-{scan.id}.pdf"
+
+    return FastAPIResponse(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename={filename}"},
+    )
