@@ -1,166 +1,417 @@
 {% extends "base.html" %}
-{% block title %}Connexion — SuturaSec{% endblock %}
+{% block title %}Connexion - SuturaSec{% endblock %}
 {% block content %}
 
-<div x-data="loginApp()" x-init="redirectIfAuth()" class="min-h-screen flex">
+<style>
+  @keyframes orb-pulse {
+    0%,100% { opacity:.4; transform:scale(1); }
+    50%      { opacity:.65; transform:scale(1.06); }
+  }
+  @keyframes shake {
+    0%,100%{ transform:translateX(0) }
+    15%    { transform:translateX(-9px) }
+    30%    { transform:translateX(9px) }
+    45%    { transform:translateX(-6px) }
+    60%    { transform:translateX(6px) }
+    75%    { transform:translateX(-3px) }
+    90%    { transform:translateX(3px) }
+  }
+  @keyframes fade-up {
+    from { opacity:0; transform:translateY(12px) }
+    to   { opacity:1; transform:translateY(0) }
+  }
+  .orb-1 { animation: orb-pulse 7s ease-in-out infinite; }
+  .orb-2 { animation: orb-pulse 9s ease-in-out infinite 3.5s; }
+  .anim-shake    { animation: shake .5s ease-in-out; }
+  .anim-fade-up  { animation: fade-up .38s cubic-bezier(.22,1,.36,1) both; }
 
-  <!-- ===== LEFT PANEL — Brand (hidden on mobile) ===== -->
-  <div class="hidden lg:flex lg:w-1/2 xl:w-3/5 relative overflow-hidden
-              bg-gradient-to-br from-gray-900 via-indigo-950 to-gray-900
-              dark:from-gray-950 dark:via-indigo-950/80 dark:to-gray-950
-              flex-col items-center justify-center p-12">
+  /* focus glow — adapts to mode */
+  .sec-input:focus {
+    outline: none;
+    border-color: #6366f1 !important;
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.18);
+  }
+  .dark .sec-input:focus {
+    border-color: rgba(99,102,241,.55) !important;
+    box-shadow: 0 0 0 3px rgba(99,102,241,.14), 0 0 14px rgba(99,102,241,.07);
+  }
 
-    <!-- Background decoration -->
-    <div class="absolute inset-0 overflow-hidden pointer-events-none">
-      <div class="absolute -top-40 -left-40 w-96 h-96 rounded-full bg-indigo-600/10 blur-3xl"></div>
-      <div class="absolute -bottom-40 -right-20 w-80 h-80 rounded-full bg-violet-600/10 blur-3xl"></div>
-      <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full border border-indigo-500/5"></div>
-      <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] rounded-full border border-indigo-500/5"></div>
-      <!-- Grid pattern -->
-      <svg class="absolute inset-0 w-full h-full opacity-[0.04]" xmlns="http://www.w3.org/2000/svg">
+  /* gradient border only in dark mode */
+  .dark .glass-card::before {
+    content:'';
+    position:absolute; inset:0;
+    border-radius:1rem;
+    padding:1px;
+    background: linear-gradient(135deg,rgba(99,102,241,.22) 0%,rgba(124,58,237,.12) 55%,rgba(99,102,241,.06) 100%);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events:none;
+  }
+</style>
+
+<div x-data="loginApp()" x-init="redirectIfAuth()"
+     class="min-h-screen flex bg-gray-50 dark:bg-[#08080f]">
+
+  <!-- Ambient orbs — dark mode only -->
+  <div class="fixed inset-0 pointer-events-none overflow-hidden z-0 opacity-0 dark:opacity-100 transition-opacity duration-500"
+       aria-hidden="true">
+    <div class="orb-1 absolute -top-[30%] -left-[20%] w-[700px] h-[700px] rounded-full
+                bg-indigo-700/[0.09] blur-[150px]"></div>
+    <div class="orb-2 absolute -bottom-[30%] -right-[15%] w-[600px] h-[600px] rounded-full
+                bg-violet-700/[0.09] blur-[130px]"></div>
+    <svg class="absolute inset-0 w-full h-full opacity-[0.03]" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <pattern id="lg" width="48" height="48" patternUnits="userSpaceOnUse">
+          <path d="M48 0L0 0 0 48" fill="none" stroke="#6366f1" stroke-width=".5"/>
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#lg)"/>
+    </svg>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════
+       LEFT PANEL — always branded (indigo → violet)
+  ═══════════════════════════════════════════════════════ -->
+  <div class="hidden lg:flex lg:w-[42%] xl:w-[40%] relative z-10
+              flex-col justify-between p-12 xl:p-14
+              bg-gradient-to-br from-indigo-700 via-indigo-600 to-violet-700
+              overflow-hidden">
+
+    <!-- Subtle overlay grid on left panel -->
+    <div class="absolute inset-0 pointer-events-none opacity-[0.06]" aria-hidden="true">
+      <svg class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
         <defs>
-          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" stroke-width="1"/>
+          <pattern id="lpg" width="44" height="44" patternUnits="userSpaceOnUse">
+            <path d="M44 0L0 0 0 44" fill="none" stroke="white" stroke-width=".6"/>
           </pattern>
         </defs>
-        <rect width="100%" height="100%" fill="url(#grid)"/>
+        <rect width="100%" height="100%" fill="url(#lpg)"/>
       </svg>
     </div>
+    <!-- Orb inside left panel -->
+    <div class="absolute -bottom-24 -right-24 w-72 h-72 rounded-full bg-white/[0.06] blur-3xl pointer-events-none"></div>
 
-    <!-- Content -->
-    <div class="relative z-10 max-w-lg text-center">
+    <div class="relative z-10">
       <!-- Logo -->
-      <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl
-                  bg-gradient-to-br from-indigo-500 to-violet-600
-                  shadow-2xl shadow-indigo-500/40 mb-8">
-        <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24"
-             fill="none" stroke="white" stroke-width="2">
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      <div class="flex items-center gap-3.5 mb-12">
+        <svg width="40" height="46" viewBox="0 0 200 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="lpSG" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="white" stop-opacity=".9"/>
+              <stop offset="100%" stop-color="white" stop-opacity=".6"/>
+            </linearGradient>
+          </defs>
+          <path d="M100 8 L176 36 L176 110 Q176 162 100 205 Q24 162 24 110 L24 36 Z"
+                fill="white" opacity=".2"/>
+          <path d="M100 8 L176 36 L176 110 Q176 162 100 205 Q24 162 24 110 L24 36 Z"
+                fill="none" stroke="white" stroke-opacity=".5" stroke-width="1.5"/>
+          <path d="M100 8 L176 36 L176 75 Q138 45 100 42 Q62 45 24 75 L24 36 Z"
+                fill="white" opacity=".12"/>
+          <path d="M118 68 C118 58,108 52,98 52 C84 52,74 60,74 72 C74 84,84 90,98 94 C112 98,126 104,126 118 C126 130,116 138,102 138 C88 138,78 132,78 122"
+                stroke="white" stroke-width="10" stroke-linecap="round" fill="none"/>
+          <line x1="125" y1="52"  x2="75"  y2="142" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity=".7"/>
+          <line x1="107" y1="66"  x2="123" y2="74"  stroke="white" stroke-width="2.5" stroke-linecap="round" opacity=".7"/>
+          <line x1="97"  y1="84"  x2="113" y2="92"  stroke="white" stroke-width="2.5" stroke-linecap="round" opacity=".7"/>
+          <line x1="87"  y1="102" x2="103" y2="110" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity=".7"/>
+          <line x1="77"  y1="120" x2="93"  y2="128" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity=".7"/>
         </svg>
+        <div>
+          <p class="font-bold text-white text-[17px] tracking-tight leading-tight">SuturaSec</p>
+          <p class="text-[9px] text-white/50 font-bold uppercase tracking-[0.24em] mt-0.5">Security Platform</p>
+        </div>
       </div>
 
-      <h1 class="text-4xl font-bold text-white mb-3 tracking-tight">SuturaSec</h1>
-      <p class="text-indigo-300 text-lg font-medium mb-10">Security as a Service Platform</p>
+      <!-- Hero -->
+      <div class="mb-10">
+        <p class="text-[11px] font-bold text-white/50 uppercase tracking-[0.2em] mb-4">
+          Security as a Service
+        </p>
+        <h2 class="text-[2.1rem] font-bold text-white leading-[1.18] tracking-tight mb-4">
+          Protégez.<br/>
+          <span class="text-white/70">Détectez.</span><br/>
+          Réagissez.
+        </h2>
+        <p class="text-white/55 text-[13px] leading-relaxed max-w-[270px]">
+          Analyse de sécurité automatisée, propulsée par l'IA, avec rapports
+          d'experts en temps réel.
+        </p>
+      </div>
 
-      <!-- Feature highlights -->
-      <div class="space-y-4 text-left">
-        <div class="flex items-start gap-4 bg-white/5 rounded-2xl p-4 border border-white/10">
-          <div class="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center flex-shrink-0">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2">
-              <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
+      <!-- Features -->
+      <div class="space-y-2.5">
+        <div class="flex items-center gap-3.5 px-4 py-3 rounded-xl bg-white/10 border border-white/15">
+          <div class="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center flex-shrink-0">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="2" y1="12" x2="22" y2="12"/>
               <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
             </svg>
           </div>
-          <div>
-            <p class="text-white font-semibold text-sm">Scanner Web & Réseau</p>
-            <p class="text-gray-400 text-xs mt-0.5">Détection automatisée OWASP Top 10, SSL/TLS, headers HTTP</p>
+          <div class="flex-1">
+            <p class="text-white text-[12.5px] font-semibold">Scanner Web & Réseau</p>
+            <p class="text-white/50 text-[11px] mt-0.5">OWASP Top 10 · SSL/TLS · Headers</p>
           </div>
+          <span class="text-[9.5px] font-bold text-emerald-300 bg-emerald-400/20 border border-emerald-300/25 px-2 py-0.5 rounded-full">ACTIF</span>
         </div>
-        <div class="flex items-start gap-4 bg-white/5 rounded-2xl p-4 border border-white/10">
-          <div class="w-9 h-9 rounded-xl bg-violet-500/20 border border-violet-500/30 flex items-center justify-center flex-shrink-0">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+
+        <div class="flex items-center gap-3.5 px-4 py-3 rounded-xl bg-white/10 border border-white/15">
+          <div class="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center flex-shrink-0">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+              <line x1="12" y1="22.08" x2="12" y2="12"/>
             </svg>
           </div>
-          <div>
-            <p class="text-white font-semibold text-sm">Analyse IA par Claude</p>
-            <p class="text-gray-400 text-xs mt-0.5">Chemins d'attaque, priorités et recommandations intelligentes</p>
+          <div class="flex-1">
+            <p class="text-white text-[12.5px] font-semibold">Analyse IA</p>
+            <p class="text-white/50 text-[11px] mt-0.5">Chemins d'attaque · Remédiation</p>
           </div>
+          <span class="text-[9.5px] font-bold text-violet-200 bg-violet-400/20 border border-violet-200/25 px-2 py-0.5 rounded-full">IA</span>
         </div>
-        <div class="flex items-start gap-4 bg-white/5 rounded-2xl p-4 border border-white/10">
-          <div class="w-9 h-9 rounded-xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center flex-shrink-0">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2">
+
+        <div class="flex items-center gap-3.5 px-4 py-3 rounded-xl bg-white/10 border border-white/15">
+          <div class="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center flex-shrink-0">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
               <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
             </svg>
           </div>
-          <div>
-            <p class="text-white font-semibold text-sm">Rapports PDF Professionnels</p>
-            <p class="text-gray-400 text-xs mt-0.5">Rapports complets et exportables pour vos clients</p>
+          <div class="flex-1">
+            <p class="text-white text-[12.5px] font-semibold">Rapports PDF Professionnels</p>
+            <p class="text-white/50 text-[11px] mt-0.5">CVSS scoring · Exportables</p>
           </div>
+          <span class="text-[9.5px] font-bold text-cyan-200 bg-cyan-400/20 border border-cyan-200/25 px-2 py-0.5 rounded-full">PDF</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="relative z-10 border-t border-white/20 pt-7 mt-8">
+      <div class="grid grid-cols-3 gap-4">
+        <div>
+          <p class="text-[1.5rem] font-bold text-white tabular-nums"
+             x-data="{n:0}"
+             x-init="$nextTick(()=>{let i=setInterval(()=>{n=Math.min(n+53,2847);if(n>=2847)clearInterval(i)},14)})">
+            <span x-text="n.toLocaleString('fr-FR')">0</span>
+          </p>
+          <p class="text-[10.5px] text-white/45 mt-0.5">Scans réalisés</p>
+        </div>
+        <div>
+          <p class="text-[1.5rem] font-bold text-amber-300 tabular-nums"
+             x-data="{n:0}"
+             x-init="$nextTick(()=>{let i=setInterval(()=>{n=Math.min(n+7,342);if(n>=342)clearInterval(i)},18)})">
+            <span x-text="n">0</span>
+          </p>
+          <p class="text-[10.5px] text-white/45 mt-0.5">Vulnérabilités</p>
+        </div>
+        <div>
+          <p class="text-[1.5rem] font-bold text-emerald-300">99.9%</p>
+          <p class="text-[10.5px] text-white/45 mt-0.5">Disponibilité</p>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ===== RIGHT PANEL — Form ===== -->
-  <div class="flex-1 flex flex-col items-center justify-center px-6 py-12
-              bg-white dark:bg-gray-950">
 
-    <div class="w-full max-w-sm">
+  <!-- ════════════════════════════════════════════════════
+       RIGHT PANEL — form (light / dark)
+  ═══════════════════════════════════════════════════════ -->
+  <div class="flex-1 flex flex-col items-center justify-center px-5 py-10 relative z-10
+              bg-gray-50 dark:bg-[#08080f]">
+    <div class="w-full max-w-[400px] anim-fade-up">
 
-      <!-- Mobile logo (small screens only) -->
-      <div class="lg:hidden text-center mb-8">
-        <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl
-                    bg-gradient-to-br from-indigo-500 to-violet-600 shadow-lg shadow-indigo-500/30 mb-4">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
-               fill="none" stroke="white" stroke-width="2.5">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      <!-- Mobile logo -->
+      <div class="lg:hidden flex flex-col items-center mb-9">
+        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-700
+                    flex items-center justify-center shadow-lg shadow-indigo-500/25 mb-3">
+          <svg width="30" height="34" viewBox="0 0 200 220" fill="none">
+            <path d="M100 8 L176 36 L176 110 Q176 162 100 205 Q24 162 24 110 L24 36 Z" fill="white" opacity=".25"/>
+            <path d="M118 68 C118 58,108 52,98 52 C84 52,74 60,74 72 C74 84,84 90,98 94 C112 98,126 104,126 118 C126 130,116 138,102 138 C88 138,78 132,78 122"
+                  stroke="white" stroke-width="12" stroke-linecap="round" fill="none"/>
+            <line x1="125" y1="52" x2="75" y2="142" stroke="white" stroke-width="3" stroke-linecap="round" opacity=".8"/>
           </svg>
         </div>
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">SuturaSec</h1>
+        <p class="text-gray-900 dark:text-white font-bold text-xl tracking-tight">SuturaSec</p>
+        <p class="text-[9.5px] text-indigo-500 dark:text-indigo-400/65 font-bold uppercase tracking-[0.22em] mt-0.5">Security Platform</p>
       </div>
 
-      <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-1">Bon retour 👋</h2>
-      <p class="text-gray-500 dark:text-gray-400 text-sm mb-8">Connectez-vous à votre espace sécurité</p>
+      <!-- Form card -->
+      <div class="glass-card relative rounded-2xl
+                  bg-white dark:bg-white/[0.025]
+                  border border-gray-100 dark:border-white/[0.08]
+                  shadow-sm dark:shadow-[0_20px_70px_rgba(0,0,0,0.5)]
+                  dark:backdrop-blur-xl p-8"
+           :class="shaking ? 'anim-shake' : ''">
 
-      <!-- Error -->
-      <div x-show="error" x-cloak
-           class="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800
-                  text-red-600 dark:text-red-400 rounded-xl px-4 py-3 text-sm mb-5">
-        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="flex-shrink-0">
-          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-        </svg>
-        <span x-text="error"></span>
+        <!-- Top inset line (dark only) -->
+        <div class="absolute inset-x-0 top-0 h-px rounded-t-2xl
+                    bg-gradient-to-r from-transparent via-indigo-500/0 dark:via-indigo-500/20 to-transparent
+                    pointer-events-none"></div>
+
+        <div class="relative z-10">
+          <!-- Header -->
+          <div class="flex items-start justify-between mb-7">
+            <div>
+              <h1 class="text-[1.55rem] font-bold text-gray-900 dark:text-white tracking-tight leading-tight">
+                Bon retour
+              </h1>
+              <p class="text-gray-500 text-[13px] mt-1">
+                Connectez-vous à votre espace sécurité
+              </p>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-500/12
+                        border border-indigo-100 dark:border-indigo-500/22
+                        flex items-center justify-center flex-shrink-0 mt-0.5">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
+                   stroke="#6366f1" stroke-width="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            </div>
+          </div>
+
+          <!-- Error -->
+          <div x-show="error" x-cloak
+               x-transition:enter="transition ease-out duration-200"
+               x-transition:enter-start="opacity-0 -translate-y-2"
+               x-transition:enter-end="opacity-100 translate-y-0"
+               class="flex items-start gap-2.5 rounded-xl px-4 py-3 mb-5 text-[13px]
+                      bg-red-50 dark:bg-red-500/[0.07]
+                      border border-red-200 dark:border-red-500/25
+                      text-red-600 dark:text-red-400">
+            <svg class="flex-shrink-0 mt-0.5" width="14" height="14" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <span x-text="error" class="leading-snug"></span>
+          </div>
+
+          <!-- Form -->
+          <form @submit.prevent="submit" class="space-y-4" autocomplete="on" novalidate>
+
+            <!-- Username -->
+            <div>
+              <label for="login-user"
+                     class="block text-[11px] font-bold text-gray-500 dark:text-gray-500
+                            uppercase tracking-[0.12em] mb-2">
+                Identifiant
+              </label>
+              <div class="relative">
+                <div class="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-600 pointer-events-none">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                  </svg>
+                </div>
+                <input id="login-user" type="text" x-model="form.username" required
+                       autocomplete="username" placeholder="votre_username"
+                       class="sec-input w-full pl-10 pr-4 py-3 rounded-xl text-sm
+                              text-gray-900 dark:text-white
+                              bg-gray-50 dark:bg-white/[0.05]
+                              border border-gray-200 dark:border-white/[0.09]
+                              placeholder-gray-400 dark:placeholder-gray-600
+                              transition-all duration-200"/>
+              </div>
+            </div>
+
+            <!-- Password -->
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <label for="login-pwd"
+                       class="block text-[11px] font-bold text-gray-500 dark:text-gray-500
+                              uppercase tracking-[0.12em]">
+                  Mot de passe
+                </label>
+                <a href="#"
+                   class="text-[11.5px] text-indigo-500 dark:text-indigo-400/80
+                          hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors">
+                  Oublié ?
+                </a>
+              </div>
+              <div class="relative">
+                <div class="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-600 pointer-events-none">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
+                </div>
+                <input id="login-pwd" :type="showPwd ? 'text' : 'password'"
+                       x-model="form.password" required
+                       autocomplete="current-password" placeholder="••••••••"
+                       class="sec-input w-full pl-10 pr-12 py-3 rounded-xl text-sm
+                              text-gray-900 dark:text-white
+                              bg-gray-50 dark:bg-white/[0.05]
+                              border border-gray-200 dark:border-white/[0.09]
+                              placeholder-gray-400 dark:placeholder-gray-600
+                              transition-all duration-200"/>
+                <button type="button" @click="showPwd = !showPwd"
+                        class="absolute right-3.5 top-1/2 -translate-y-1/2
+                               text-gray-400 dark:text-gray-600
+                               hover:text-gray-600 dark:hover:text-gray-400
+                               transition-colors focus:outline-none">
+                  <svg x-show="!showPwd" width="16" height="16" viewBox="0 0 24 24"
+                       fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </svg>
+                  <svg x-show="showPwd" x-cloak width="16" height="16" viewBox="0 0 24 24"
+                       fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                    <path d="m1 1 22 22"/><path d="M9.53 9.53a3 3 0 1 0 4.24 4.24"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Remember me -->
+            <div class="flex items-center gap-2.5 pt-0.5">
+              <input type="checkbox" id="remember" x-model="form.remember"
+                     class="w-4 h-4 rounded border-gray-300 dark:border-white/20
+                            accent-indigo-600 cursor-pointer"/>
+              <label for="remember"
+                     class="text-[12.5px] text-gray-500 dark:text-gray-500 cursor-pointer select-none">
+                Rester connecté pendant 30 jours
+              </label>
+            </div>
+
+            <!-- Submit -->
+            <button type="submit" :disabled="loading"
+                    class="w-full py-[11px] rounded-xl text-sm font-semibold text-white
+                           bg-gradient-to-r from-indigo-600 to-violet-600
+                           hover:from-indigo-500 hover:to-violet-500
+                           disabled:opacity-50 disabled:cursor-not-allowed
+                           shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30
+                           transition-all duration-200 active:scale-[0.98]
+                           flex items-center justify-center gap-2 mt-2">
+              <svg x-show="loading" class="animate-spin flex-shrink-0"
+                   width="15" height="15" viewBox="0 0 24 24"
+                   fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+              </svg>
+              <span x-text="loading ? 'Vérification…' : 'Se connecter'"></span>
+            </button>
+          </form>
+
+          <!-- Register link -->
+          <p class="text-center text-[13px] text-gray-500 dark:text-gray-600 mt-6">
+            Pas encore de compte ?
+            <a href="/register"
+               class="text-indigo-600 dark:text-indigo-400 font-semibold
+                      hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors ml-0.5">
+              Créer un accès →
+            </a>
+          </p>
+        </div>
       </div>
-
-      <form @submit.prevent="submit" class="space-y-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-            Nom d'utilisateur
-          </label>
-          <input type="text" x-model="form.username" required placeholder="votre_username"
-                 class="w-full rounded-xl px-4 py-3 text-sm
-                        bg-gray-50 dark:bg-gray-900
-                        border border-gray-200 dark:border-gray-700
-                        text-gray-900 dark:text-white
-                        placeholder-gray-400 dark:placeholder-gray-600
-                        focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500
-                        transition-colors" />
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-            Mot de passe
-          </label>
-          <input type="password" x-model="form.password" required placeholder="••••••••"
-                 class="w-full rounded-xl px-4 py-3 text-sm
-                        bg-gray-50 dark:bg-gray-900
-                        border border-gray-200 dark:border-gray-700
-                        text-gray-900 dark:text-white
-                        placeholder-gray-400 dark:placeholder-gray-600
-                        focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500
-                        transition-colors" />
-        </div>
-
-        <button type="submit" :disabled="loading"
-                class="w-full py-3 rounded-xl text-sm font-semibold text-white
-                       bg-indigo-600 hover:bg-indigo-500
-                       disabled:opacity-60 disabled:cursor-not-allowed
-                       shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40
-                       transition-all duration-150 mt-2">
-          <span x-text="loading ? 'Connexion en cours...' : 'Se connecter'"></span>
-        </button>
-      </form>
-
-      <p class="text-center text-sm text-gray-500 dark:text-gray-500 mt-6">
-        Pas encore de compte ?
-        <a href="/register" class="text-indigo-600 dark:text-indigo-400 font-medium hover:underline">
-          Créer un compte
-        </a>
-      </p>
 
       <!-- Footer -->
-      <p class="text-center text-xs text-gray-400 dark:text-gray-700 mt-12">
+      <p class="text-center text-[11.5px] text-gray-400 dark:text-gray-700 mt-5">
         SuturaSec · Security as a Service
       </p>
     </div>
@@ -170,33 +421,47 @@
 <script>
 function loginApp() {
   return {
-    form: { username: '', password: '' },
-    error: '', loading: false,
+    form: { username: '', password: '', remember: false },
+    error:   '',
+    loading: false,
+    showPwd: false,
+    shaking: false,
+
     async submit() {
-      this.error = '';
+      this.error   = '';
       this.loading = true;
       try {
-        const body = new URLSearchParams({ username: this.form.username, password: this.form.password });
+        const body = new URLSearchParams({
+          username: this.form.username.trim(),
+          password: this.form.password,
+        });
         const res = await fetch('/api/auth/login', {
-          method: 'POST',
+          method:  'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body,
         });
         if (!res.ok) {
-          const d = await res.json();
-          this.error = d.detail || 'Identifiants incorrects';
+          const d = await res.json().catch(() => ({}));
+          this.error = d.detail || 'Identifiants incorrects.';
+          this._shake();
           return;
         }
         const data = await res.json();
         localStorage.setItem('token', data.access_token);
         window.location.href = '/dashboard';
       } catch {
-        this.error = 'Erreur réseau. Vérifiez votre connexion.';
+        this.error = 'Erreur réseau — vérifiez votre connexion.';
+        this._shake();
       } finally {
         this.loading = false;
       }
-    }
-  }
+    },
+
+    _shake() {
+      this.shaking = true;
+      setTimeout(() => { this.shaking = false; }, 550);
+    },
+  };
 }
 </script>
 {% endblock %}

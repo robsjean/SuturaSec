@@ -9,13 +9,20 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.scan import Scan, Vulnerability
 from app.models.user import User
-from app.schemas.scan import ScanCreate, ScanListResponse, ScanResponse
+from app.schemas.scan import AuthConfig, ScanCreate, ScanListResponse, ScanResponse
 from app.services.auth import get_current_user
 
 router = APIRouter(prefix="/api/scans", tags=["scans"])
 
 
-def _run_scan(scan_id: int, db_url: str):
+def _run_scan(
+    scan_id: int,
+    db_url: str,
+    auth_login: str = "",
+    auth_password: str = "",
+    auth_login_url: str = "",
+    auth_token: str = "",
+):
     """Exécute le scanner réel en tâche de fond (BackgroundTasks)."""
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
@@ -62,6 +69,32 @@ def _run_scan(scan_id: int, db_url: str):
             api_scanner = APIScanner(scan.target)
             findings, api_results = api_scanner.run()
             scan.api_results = api_results
+        elif scan.scan_type == "authenticated_web":
+            from app.scanners.auth_handler import UniversalAuthHandler
+            from app.scanners.authenticated_scanner import AuthenticatedScanner
+            handler = UniversalAuthHandler(
+                target=scan.target,
+                login_identifier=auth_login,
+                password=auth_password,
+                login_url=auth_login_url or None,
+                provided_token=auth_token or None,
+            )
+            auth_session = handler.authenticate()
+            scan.auth_meta = {
+                "strategy": auth_session.strategy,
+                "success": auth_session.success,
+                "login_url_used": auth_session.login_url_used,
+                "token_type": auth_session.token_type,
+                "is_jwt": auth_session.is_jwt,
+            }
+            auth_scanner = AuthenticatedScanner(scan.target, auth_session)
+            findings = auth_scanner.run()
+            # Clean up HTTP client
+            if auth_session.client:
+                try:
+                    auth_session.client.close()
+                except Exception:
+                    pass
         else:
             # OSINT recon
             from app.scanners.osint_scanner import OSINTScanner
@@ -101,8 +134,8 @@ def _run_scan(scan_id: int, db_url: str):
             "top_priorities": ai_result.get("top_priorities", []),
             "quick_wins": ai_result.get("quick_wins", []),
         }
-        # Compliance analysis (web + network only)
-        if scan.scan_type in ("web", "network") and findings:
+        # Compliance analysis (web, network, authenticated_web)
+        if scan.scan_type in ("web", "network", "authenticated_web") and findings:
             from app.services.compliance_engine import run_compliance_analysis
             scan.compliance_reports = run_compliance_analysis(findings)
 
@@ -128,8 +161,16 @@ def create_scan(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if scan_data.scan_type not in ("web", "network", "cti", "subdomain", "api", "osint"):
-        raise HTTPException(status_code=400, detail="scan_type doit être 'web', 'network', 'cti', 'subdomain', 'api' ou 'osint'")
+    VALID_TYPES = ("web", "network", "cti", "subdomain", "api", "osint", "authenticated_web")
+    if scan_data.scan_type not in VALID_TYPES:
+        raise HTTPException(status_code=400, detail=f"scan_type doit être l'un de : {', '.join(VALID_TYPES)}")
+
+    if scan_data.scan_type == "authenticated_web":
+        if not scan_data.auth_config or not scan_data.auth_config.login_identifier:
+            raise HTTPException(
+                status_code=400,
+                detail="auth_config (login_identifier + password) requis pour un scan authentifié",
+            )
 
     scan = Scan(
         user_id=current_user.id,
@@ -142,7 +183,16 @@ def create_scan(
     db.refresh(scan)
 
     from app.config import settings
-    background_tasks.add_task(_run_scan, scan.id, settings.DATABASE_URL)
+    ac: Optional[AuthConfig] = scan_data.auth_config
+    background_tasks.add_task(
+        _run_scan,
+        scan.id,
+        settings.DATABASE_URL,
+        auth_login=ac.login_identifier if ac else "",
+        auth_password=ac.password if ac else "",
+        auth_login_url=ac.login_url or "" if ac else "",
+        auth_token=ac.provided_token or "" if ac else "",
+    )
 
     return scan
 

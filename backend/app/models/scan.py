@@ -20,6 +20,7 @@ class Scan(Base):
     subdomain_results = Column(JSON, nullable=True)
     api_results = Column(JSON, nullable=True)
     osint_results = Column(JSON, nullable=True)
+    auth_meta = Column(JSON, nullable=True)   # strategy, login_url_used — no credentials stored
     created_at = Column(DateTime, default=datetime.utcnow)
     completed_at = Column(DateTime, nullable=True)
 

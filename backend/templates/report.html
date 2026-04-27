@@ -218,6 +218,33 @@ tr:nth-child(even) td { background:#fafafa; }
 .callout-warn { background:#fffbeb; border:1pt solid #fde68a; }
 .callout-ok   { background:#f0fdf4; border:1pt solid #bbf7d0; }
 
+/* ================================================================ PRINT BUTTON (screen only) */
+#print-btn {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #4f46e5;
+  color: #fff;
+  border: none;
+  border-radius: 50px;
+  padding: 12px 22px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: system-ui, sans-serif;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(79,70,229,0.45);
+  transition: background .15s, transform .1s;
+}
+#print-btn:hover { background: #4338ca; transform: translateY(-1px); }
+#print-btn svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+@media print {
+  #print-btn { display: none !important; }
+}
+
 </style>
 </head>
 <body>
@@ -877,6 +904,12 @@ tr:nth-child(even) td { background:#fafafa; }
   Il contient des informations confidentielles destinées exclusivement au destinataire désigné.
   Toute divulgation ou reproduction sans autorisation est interdite.
 </div>
+
+
+<button id="print-btn" onclick="window.print()">
+  <svg viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+  Télécharger PDF
+</button>
 
 </body>
 </html>

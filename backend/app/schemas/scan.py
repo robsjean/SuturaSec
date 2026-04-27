@@ -3,9 +3,18 @@ from typing import Any, List, Optional
 from pydantic import BaseModel
 
 
+class AuthConfig(BaseModel):
+    """Credentials passed at scan creation time — never persisted to DB."""
+    login_identifier: str          # email or username
+    password: str
+    login_url: Optional[str] = None        # explicit login endpoint (optional)
+    provided_token: Optional[str] = None   # skip auth, use this token directly
+
+
 class ScanCreate(BaseModel):
     target: str
-    scan_type: str  # "web" | "network"
+    scan_type: str          # "web" | "network" | "authenticated_web" | ...
+    auth_config: Optional[AuthConfig] = None
 
 
 class VulnerabilityResponse(BaseModel):
@@ -36,6 +45,7 @@ class ScanResponse(BaseModel):
     subdomain_results: Optional[Any] = None
     api_results: Optional[Any] = None
     osint_results: Optional[Any] = None
+    auth_meta: Optional[Any] = None
     created_at: datetime
     completed_at: Optional[datetime]
     vulnerabilities: List[VulnerabilityResponse] = []

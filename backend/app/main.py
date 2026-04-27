@@ -33,6 +33,70 @@ app.add_middleware(
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
+# ── Custom Jinja2 filters ────────────────────────────────────────────────────
+from datetime import datetime as _dt
+
+def _fmt_date(value, fmt: str = "%d/%m/%Y %H:%M") -> str:
+    if value is None:
+        return "—"
+    if isinstance(value, str):
+        try:
+            value = _dt.fromisoformat(value)
+        except ValueError:
+            return value
+    return value.strftime(fmt)
+
+_SEV_LABELS = {
+    "critical": "Critique",
+    "high": "Élevé",
+    "medium": "Moyen",
+    "low": "Faible",
+    "info": "Info",
+}
+def _sev_label(value: str) -> str:
+    return _SEV_LABELS.get((value or "").lower(), value or "—")
+
+def _score_color(score) -> str:
+    try:
+        s = float(score)
+    except (TypeError, ValueError):
+        return "#6b7280"
+    if s >= 80:
+        return "#16a34a"
+    if s >= 60:
+        return "#d97706"
+    return "#dc2626"
+
+_GRADE_COLORS = {
+    "A+": "#16a34a", "A": "#16a34a",
+    "B": "#65a30d",
+    "C": "#d97706",
+    "D": "#ea580c",
+    "E": "#dc2626", "F": "#dc2626",
+}
+def _grade_color(grade: str) -> str:
+    return _GRADE_COLORS.get((grade or "").upper(), "#6b7280")
+
+def _status_class(code) -> str:
+    try:
+        c = int(code)
+    except (TypeError, ValueError):
+        return ""
+    if c < 300:
+        return "status-ok"
+    if c < 400:
+        return "status-redirect"
+    if c < 500:
+        return "status-client-err"
+    return "status-server-err"
+
+templates.env.filters["fmt_date"]    = _fmt_date
+templates.env.filters["sev_label"]   = _sev_label
+templates.env.filters["score_color"] = _score_color
+templates.env.filters["grade_color"] = _grade_color
+templates.env.filters["status_class"] = _status_class
+# ─────────────────────────────────────────────────────────────────────────────
+
 static_dir = os.path.join(BASE_DIR, "static")
 if os.path.isdir(static_dir):
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
@@ -109,12 +173,54 @@ def page_report(
     if not scan:
         raise HTTPException(status_code=404, detail="Scan introuvable")
 
-    ai = scan.attack_paths or {}
+    vulns = scan.vulnerabilities or []
+    sev_counts = {
+        "critical": sum(1 for v in vulns if v.severity == "critical"),
+        "high":     sum(1 for v in vulns if v.severity == "high"),
+        "medium":   sum(1 for v in vulns if v.severity == "medium"),
+        "low":      sum(1 for v in vulns if v.severity == "low"),
+        "info":     sum(1 for v in vulns if v.severity == "info"),
+    }
+
+    rs = scan.risk_score
+    if rs is None:
+        risk_label = "N/A"
+    elif rs >= 7:
+        risk_label = "Critique"
+    elif rs >= 4:
+        risk_label = "Modéré"
+    else:
+        risk_label = "Faible"
+
+    _SCAN_TYPE_LABELS = {
+        "web":               "Analyse Web",
+        "network":           "Analyse Réseau",
+        "authenticated_web": "Analyse Web Authentifiée",
+        "cti":               "Cyber Threat Intelligence",
+        "subdomain":         "Énumération Sous-domaines",
+        "api":               "Sécurité API",
+        "osint":             "Reconnaissance OSINT",
+    }
+
+    ap = scan.attack_paths or {}
+
     return templates.TemplateResponse("report.html", {
-        "request": request,
-        "scan": scan,
-        "vulnerabilities": scan.vulnerabilities,
-        "ai": ai,
+        "request":         request,
+        "scan":            scan,
+        "vulnerabilities": vulns,
+        "sev_counts":      sev_counts,
+        "risk_label":      risk_label,
+        "scan_type_label": _SCAN_TYPE_LABELS.get(scan.scan_type, scan.scan_type),
+        # AI enrichment — both names used in template
+        "ai":              ap,
+        "attack_paths":    ap,
+        # Scan-type-specific results
+        "compliance":      scan.compliance_reports or None,
+        "subdomain":       scan.subdomain_results or None,
+        "osint":           scan.osint_results or None,
+        "threat_intel":    scan.threat_intel or None,
+        "api":             scan.api_results or None,
+        "generated_at":    _dt.utcnow().strftime("%Y-%m-%d %H:%M UTC"),
     })
 
 
