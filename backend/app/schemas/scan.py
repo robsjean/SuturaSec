@@ -5,8 +5,9 @@ from pydantic import BaseModel
 
 class AuthConfig(BaseModel):
     """Credentials passed at scan creation time — never persisted to DB."""
-    login_identifier: str          # email or username
-    password: str
+    # Soit identifiant + mot de passe, soit provided_token (vérifié dans le router)
+    login_identifier: str = ""             # email or username
+    password: str = ""
     login_url: Optional[str] = None        # explicit login endpoint (optional)
     provided_token: Optional[str] = None   # skip auth, use this token directly
 
@@ -15,6 +16,8 @@ class ScanCreate(BaseModel):
     target: str
     scan_type: str          # "web" | "network" | "authenticated_web" | ...
     auth_config: Optional[AuthConfig] = None
+    # L'utilisateur certifie être propriétaire de la cible ou autorisé à l'analyser
+    authorization_confirmed: bool = False
 
 
 class VulnerabilityResponse(BaseModel):

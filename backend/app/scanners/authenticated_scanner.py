@@ -114,8 +114,10 @@ class AuthenticatedScanner:
             self._check_csrf,
             self._check_sensitive_data_exposure,
             self._check_mass_assignment,
-            self._check_rate_limiting,
+            # Le bypass SQLi passe AVANT le rate limiting : ce dernier déclenche
+            # volontairement des blocages (429) qui fausseraient le test SQLi.
             self._check_auth_bypass,
+            self._check_rate_limiting,
         ]
         for check in checks:
             try:
@@ -155,6 +157,72 @@ class AuthenticatedScanner:
             if r and r.status_code in (200, 400, 401, 422):
                 return self.target + p
         return ""
+
+    # ── Helpers : tentatives de login dans le bon format ──────────────────────
+
+    _LOGIN_REJECTED_RE = re.compile(
+        r"invalid credentials|invalid password|wrong password|bad credentials|"
+        r"authentication failed|login failed|identifiants incorrects|mot de passe incorrect|"
+        r'"success"\s*:\s*false',
+        re.IGNORECASE,
+    )
+
+    def _login_attempt(self, url: str, fmt: dict, identifier: str, password: str):
+        """POST de login dans le format décrit par fmt = {encoding, id, pwd, extra}."""
+        body = {**fmt["extra"], fmt["id"]: identifier, fmt["pwd"]: password}
+        if fmt["encoding"] == "form":
+            return self._post(url, data=body)
+        return self._post(url, json=body)
+
+    def _is_login_rejection(self, r) -> bool:
+        """
+        True si l'endpoint a compris la requête et refusé les identifiants.
+        Un 400/415/422 « champ manquant / format invalide » ne compte PAS : la requête
+        n'a alors jamais atteint la vérification des identifiants.
+        """
+        if r is None:
+            return False
+        if r.status_code in (401, 403, 429):
+            return True
+        if r.status_code in (200, 400):
+            return bool(self._LOGIN_REJECTED_RE.search(r.text or ""))
+        return False
+
+    def _login_format(self, login_url: str) -> Optional[dict]:
+        """
+        Format de login à utiliser pour les checks. Priorité au format de la session
+        obtenue ; sinon (token fourni, Basic…) on le détecte avec une tentative invalide.
+        """
+        if self.auth.login_encoding and self.auth.login_id_field:
+            return {
+                "encoding": self.auth.login_encoding,
+                "id": self.auth.login_id_field,
+                "pwd": self.auth.login_pwd_field or "password",
+                "extra": dict(self.auth.login_extra),
+            }
+        for encoding in ("json", "form"):
+            for id_field in ("username", "email"):
+                fmt = {"encoding": encoding, "id": id_field, "pwd": "password", "extra": {}}
+                probe = self._login_attempt(
+                    login_url, fmt, "suturasec_format_probe@example.com", "__wrong_password__")
+                if self._is_login_rejection(probe):
+                    return fmt
+        return None
+
+    def _inconclusive(self, title: str, login_url: str, why: str):
+        """Signale honnêtement un test non réalisé, au lieu d'un faux résultat."""
+        self._add(Finding(
+            title=title,
+            severity="info",
+            category="Couverture du scan",
+            description=(
+                f"Ce test n'a pas pu être réalisé sur {login_url} : {why}. "
+                "Aucune conclusion ne doit en être tirée, ni positive ni négative."
+            ),
+            evidence=f"Endpoint : {login_url}",
+            remediation="Indiquer l'URL exacte de l'endpoint de login dans la configuration du scan, puis relancer.",
+            cvss_score=0.0,
+        ))
 
     # ── Check 1: Security Headers ─────────────────────────────────────────────
 
@@ -327,12 +395,30 @@ class AuthenticatedScanner:
     # ── Check 4: Broken Access Control ───────────────────────────────────────
 
     def _check_broken_access_control(self):
+        _SOFT_404 = re.compile(
+            r"not found|404|page not found|unauthorized|login required|access denied|forbidden|no access",
+            re.IGNORECASE,
+        )
         accessible = []
         for path in _ADMIN_PATHS:
             r = self._get(path)
-            if r and r.status_code in (200, 201) and len(r.text) > 100:
-                if "login" not in str(r.url).lower():
-                    accessible.append(path)
+            if not r or r.status_code not in (200, 201):
+                continue
+            if len(r.text) < 100:
+                continue
+            if "login" in str(r.url).lower():
+                continue
+            if _SOFT_404.search(r.text[:500]):
+                continue
+            # Confirmer que l'accès authentifié renvoie plus de contenu qu'un accès non-authentifié
+            # Si les deux renvoient 200 avec un contenu similaire, c'est un endpoint public (pas BAC)
+            try:
+                unauth_r = httpx.get(self.target + path, follow_redirects=True, timeout=10, verify=False)
+                if unauth_r.status_code == 200 and abs(len(unauth_r.text) - len(r.text)) < 200:
+                    continue  # Endpoint public — pas une violation de contrôle d'accès
+            except Exception:
+                pass
+            accessible.append(path)
             if len(accessible) >= 3:
                 break
 
@@ -342,7 +428,7 @@ class AuthenticatedScanner:
                 severity="critical",
                 category="Broken Access Control",
                 description=f"Des endpoints admin/gestion retournent HTTP 200 pour un compte utilisateur normal : {accessible}",
-                evidence=f"Paths accessibles : {accessible}",
+                evidence=f"Paths accessibles (contenu différent de l'accès non-authentifié) : {accessible}",
                 remediation="Implémenter RBAC strict. Vérifier les permissions à chaque requête côté serveur.",
                 cvss_score=9.1,
             ))
@@ -354,8 +440,10 @@ class AuthenticatedScanner:
             for path in ["/api/users", "/api/profile", "/api/admin", "/api/v1/users", "/api/me"]:
                 try:
                     r = unauth.get(self.target + path)
-                    if r.status_code in (200, 201):
-                        open_paths.append(path)
+                    if r.status_code in (200, 201) and len(r.text) > 50:
+                        # Vérifier que ce n'est pas une soft-404
+                        if not _SOFT_404.search(r.text[:300]):
+                            open_paths.append(path)
                 except Exception:
                     pass
             unauth.close()
@@ -375,18 +463,31 @@ class AuthenticatedScanner:
     # ── Check 5: IDOR ─────────────────────────────────────────────────────────
 
     def _check_idor(self):
+        # Champs PII précis — exclure "name" (trop générique, présent partout)
+        _PII_KEYS = frozenset({"email", "username", "phone", "address", "ssn", "credit_card", "social_security", "date_of_birth"})
         idor_found = []
+
         for path_tmpl in _IDOR_PATHS[:10]:
-            for test_id in (1, 2, 99999):
-                r = self._get(path_tmpl.replace("{id}", str(test_id)))
-                if r and r.status_code == 200 and len(r.text) > 50:
-                    try:
-                        text = json.dumps(r.json()).lower()
-                        if any(k in text for k in ("email", "username", "name", "phone", "address")):
-                            idor_found.append(path_tmpl.replace("{id}", str(test_id)))
-                            break
-                    except Exception:
-                        pass
+            r_low = self._get(path_tmpl.replace("{id}", "1"))
+            r_high = self._get(path_tmpl.replace("{id}", "99999"))
+
+            for r, tid in [(r_low, 1), (r_high, 99999)]:
+                if not r or r.status_code != 200 or len(r.text) < 100:
+                    continue
+                try:
+                    data = r.json()
+                    text = json.dumps(data).lower() if isinstance(data, dict) else ""
+                    if not any(k in text for k in _PII_KEYS):
+                        continue
+                    # IDOR confirmé uniquement si deux IDs différents retournent un contenu distinct
+                    if r_low and r_high and r_low.status_code == 200 and r_high.status_code == 200:
+                        if r_low.text == r_high.text:
+                            continue  # Même réponse pour tous les IDs — endpoint générique, pas IDOR
+                    idor_found.append(path_tmpl.replace("{id}", str(tid)))
+                    break
+                except Exception:
+                    pass
+
             if len(idor_found) >= 3:
                 break
 
@@ -396,7 +497,7 @@ class AuthenticatedScanner:
                 severity="high",
                 category="Broken Access Control",
                 description=f"Des ressources appartenant à d'autres utilisateurs sont accessibles par simple énumération d'ID : {idor_found[:3]}",
-                evidence=f"Exemples accessibles (HTTP 200 + PII) : {idor_found[:3]}",
+                evidence=f"Exemples accessibles (HTTP 200 + PII, contenu distinct par ID) : {idor_found[:3]}",
                 remediation="Vérifier à chaque requête que l'utilisateur est propriétaire de la ressource. Utiliser des UUIDs non séquentiels.",
                 cvss_score=8.0,
             ))
@@ -405,15 +506,31 @@ class AuthenticatedScanner:
 
     def _check_csrf(self):
         evil = "https://evil.example.com"
+        _NOT_PROCESSED = re.compile(
+            r"not found|method not allowed|invalid|bad request|unsupported|no route",
+            re.IGNORECASE,
+        )
         csrf_paths = []
         for path in ["/api/profile", "/api/user", "/api/settings", "/api/v1/user", "/api/account", "/api/me"]:
+            # Vérifier d'abord que l'endpoint existe (GET authentifié retourne 200)
+            r_get = self._get(path)
+            if not r_get or r_get.status_code != 200:
+                continue  # Endpoint inexistant — ne pas le tester
+
             r = self._post(
                 path,
                 json={"test": "csrf_probe"},
                 headers={"Origin": evil, "Referer": f"{evil}/attack"},
             )
-            if r and r.status_code in (200, 201, 204):
-                csrf_paths.append(path)
+            if not r or r.status_code not in (200, 201, 204):
+                continue
+            body = r.text.strip()
+            # Éliminer les réponses vides ou qui indiquent clairement un rejet
+            if r.status_code != 204 and len(body) < 10:
+                continue
+            if _NOT_PROCESSED.search(body[:300]):
+                continue
+            csrf_paths.append(path)
 
         if csrf_paths:
             self._add(Finding(
@@ -530,49 +647,136 @@ class AuthenticatedScanner:
         login_url = self._find_login_url()
         if not login_url:
             return
-        blocked = 0
-        for i in range(15):
-            r = self._post(
-                login_url,
-                json={"username": f"ratelimit_probe_{i}", "password": "wrong_password_x"},
+        fmt = self._login_format(login_url)
+        if not fmt:
+            self._inconclusive(
+                "Limitation de débit sur la connexion — test non réalisé", login_url,
+                "l'endpoint n'a reconnu aucun des formats de requête essayés (JSON, formulaire encodé)",
             )
-            if r and r.status_code == 429:
-                blocked += 1
-        if blocked == 0:
+            return
+
+        # Phase 1 — brute-force sur UN compte (compte fictif : on ne verrouille jamais
+        # le vrai compte de l'utilisateur).
+        attempts, statuses, understood = 15, [], 0
+        for _ in range(attempts):
+            r = self._login_attempt(login_url, fmt, "suturasec_bruteforce_probe", "wrong_password_x")
+            statuses.append(r.status_code if r is not None else None)
+            understood += self._is_login_rejection(r)
+            if r is not None and r.status_code == 429:
+                break
+        if 429 not in statuses:
+            if understood == 0:
+                self._inconclusive(
+                    "Limitation de débit sur la connexion — test non réalisé", login_url,
+                    f"les tentatives n'ont pas été traitées comme des échecs de connexion (statuts : {statuses[:5]}…)",
+                )
+                return
             self._add(Finding(
                 title="Absence de limitation de débit sur le endpoint de connexion",
                 severity="high",
                 category="Broken Authentication",
-                description=f"15 tentatives invalides consécutives n'ont pas déclenché HTTP 429 sur {login_url}. Vulnérable au brute-force.",
-                evidence=f"15 requêtes vers {login_url} sans 429",
-                remediation="Implémenter rate-limiting : 5 tentatives/15 min par IP+login. CAPTCHA après N échecs. Utiliser Redis + SlowAPI en production.",
+                description=(
+                    f"{attempts} tentatives invalides consécutives sur le même compte n'ont pas "
+                    f"déclenché de blocage (HTTP 429) sur {login_url}. Un attaquant peut tester "
+                    "des mots de passe sans limite (brute-force)."
+                ),
+                evidence=f"{attempts} POST ({fmt['encoding']}) vers {login_url} → statuts : {statuses}",
+                remediation="Bloquer après 5 échecs / 15 min par compte ET par IP. CAPTCHA après N échecs. Redis + SlowAPI en production.",
                 cvss_score=7.5,
+            ))
+            return
+
+        # Phase 2 — password spraying : un échec sur chacun de plusieurs comptes différents.
+        # Une limite uniquement par compte ne bloque pas ce scénario.
+        # 25 comptes : au-dessus des seuils globaux usuels (10–20 échecs / IP).
+        spray, spray_statuses = 25, []
+        for i in range(spray):
+            r = self._login_attempt(login_url, fmt, f"suturasec_spray_probe_{i}", "wrong_password_x")
+            spray_statuses.append(r.status_code if r is not None else None)
+            if r is not None and r.status_code == 429:
+                break
+        if 429 not in spray_statuses:
+            self._add(Finding(
+                title="Limitation de débit par compte uniquement — password spraying possible",
+                severity="medium",
+                category="Broken Authentication",
+                description=(
+                    f"Le brute-force sur un compte est bien bloqué (HTTP 429 après {len(statuses)} "
+                    f"tentatives), mais {spray} tentatives sur {spray} comptes différents depuis la "
+                    "même IP n'ont déclenché aucun blocage. Un attaquant peut essayer un mot de "
+                    "passe courant sur de nombreux comptes (password spraying, credential stuffing)."
+                ),
+                evidence=(
+                    f"Même compte : {statuses} · Comptes différents : {spray_statuses} "
+                    f"({fmt['encoding']}, {login_url})"
+                ),
+                remediation="Ajouter une limite globale par IP (ex. 20 échecs / 15 min, tous comptes confondus) en plus de la limite par compte.",
+                cvss_score=5.3,
             ))
 
     # ── Check 10: Authentication Bypass ──────────────────────────────────────
+
+    @staticmethod
+    def _is_auth_success(r) -> bool:
+        """
+        Critères stricts pour éviter les faux positifs sur les pages HTML
+        contenant des mots comme 'token' (CSRF token dans les formulaires).
+
+        Un vrai bypass doit :
+          1. Retourner JSON (Content-Type application/json)
+          2. Contenir un JWT (commence par eyJ) OU un champ access_token/session_token
+        """
+        if r is None or r.status_code not in (200, 201):
+            return False
+        ct = r.headers.get("content-type", "")
+        if "application/json" not in ct:
+            return False
+        try:
+            data = r.json()
+        except Exception:
+            return False
+        # Cherche un token JWT ou un champ session/access
+        for key in ("access_token", "token", "session_token", "id_token", "jwt"):
+            val = data.get(key, "")
+            if isinstance(val, str) and val.startswith("eyJ"):
+                return True
+        return False
 
     def _check_auth_bypass(self):
         login_url = self._find_login_url()
         if not login_url:
             return
-        successes = []
+
+        title_na = "Injection SQL sur la connexion — test non réalisé"
+        fmt = self._login_format(login_url)
+        if not fmt:
+            self._inconclusive(
+                title_na, login_url,
+                "l'endpoint n'a reconnu aucun des formats de requête essayés (JSON, formulaire encodé)",
+            )
+            return
+
+        # Baseline : des identifiants clairement faux doivent être refusés « proprement »
+        baseline = self._login_attempt(login_url, fmt, "__baseline_user__", "__baseline_pass__")
+        if self._is_auth_success(baseline):
+            self._inconclusive(title_na, login_url, "l'endpoint renvoie un token même pour des identifiants invalides")
+            return
+        if baseline is not None and baseline.status_code == 429:
+            self._inconclusive(title_na, login_url, "l'endpoint bloque déjà les tentatives (HTTP 429)")
+            return
+
+        successes, tested, not_processed = [], 0, []
         for user_payload, pwd_payload in _SQLI_PAYLOADS:
-            for id_key in ("username", "email"):
-                try:
-                    r = self.client.post(
-                        login_url,
-                        json={id_key: user_payload, "password": pwd_payload},
-                        headers={"Content-Type": "application/json"},
-                    )
-                    if r and r.status_code in (200, 201):
-                        text = r.text.lower()
-                        if any(k in text for k in ("token", "access_token", "dashboard", "logged")):
-                            successes.append(user_payload)
-                            break
-                except Exception:
-                    pass
-            if successes:
+            r = self._login_attempt(login_url, fmt, user_payload, pwd_payload)
+            if self._is_auth_success(r):
+                successes.append(user_payload)
                 break
+            if self._is_login_rejection(r):
+                tested += 1
+            else:
+                # 422 « format d'email invalide », 429, erreur… : le payload n'a pas
+                # atteint la requête SQL, on ne peut rien conclure pour lui.
+                not_processed.append((user_payload, r.status_code if r is not None else None))
 
         if successes:
             self._add(Finding(
@@ -580,17 +784,29 @@ class AuthenticatedScanner:
                 severity="critical",
                 category="Injection",
                 description=f"Des payloads SQLi ont contourné l'authentification : {successes[:3]}",
-                evidence=f"Payloads : {successes[:3]} → HTTP 200 + token",
+                evidence=f"Payloads ({fmt['encoding']}, champ « {fmt['id']} ») : {successes[:3]} → HTTP 200 + token",
                 remediation="Utiliser des requêtes paramétrées. Ne jamais concaténer les entrées dans les requêtes SQL.",
                 cvss_score=9.8,
             ))
+        elif tested == 0:
+            self._inconclusive(
+                title_na, login_url,
+                f"aucun payload n'a été traité comme une tentative de connexion (réponses : {not_processed})",
+            )
         else:
+            partial = (
+                f" {len(not_processed)} payload(s) rejeté(s) avant traitement : {not_processed}."
+                if not_processed else ""
+            )
             self._add(Finding(
                 title="Résistance aux injections SQL basiques — vérifiée",
                 severity="info",
                 category="Injection",
-                description="5 payloads SQLi classiques testés sur le formulaire de connexion sans succès.",
-                evidence=f"Endpoint testé : {login_url}",
+                description=(
+                    f"{tested} payload(s) SQLi classique(s) sur {len(_SQLI_PAYLOADS)} ont été traités par "
+                    f"l'endpoint de connexion et correctement refusés.{partial}"
+                ),
+                evidence=f"Endpoint : {login_url} · format {fmt['encoding']}, champ « {fmt['id']} »",
                 remediation="Continuer à utiliser des requêtes préparées. Effectuer un pentest approfondi avec un outil dédié.",
                 cvss_score=0.0,
             ))

@@ -21,6 +21,48 @@ app = FastAPI(
     version="0.1.0",
 )
 
+# ── Erreurs de validation : messages en français, lisibles par l'utilisateur ──
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+
+_FIELD_LABELS = {
+    "email": "Adresse email", "username": "Nom d'utilisateur", "password": "Mot de passe",
+    "target": "Cible", "scan_type": "Type d'analyse", "login_identifier": "Identifiant de connexion",
+}
+
+
+def _french_validation_message(err: dict) -> str:
+    loc = [str(p) for p in err.get("loc", []) if p not in ("body", "query", "path")]
+    field = loc[-1] if loc else ""
+    label = _FIELD_LABELS.get(field, field or "Champ")
+    etype, msg, ctx = err.get("type", ""), err.get("msg", ""), err.get("ctx") or {}
+    if etype == "missing":
+        return f"{label} : champ obligatoire."
+    if field == "email" or "email address" in msg:
+        return "Adresse email invalide. Vérifiez le format (ex. nom@domaine.com)."
+    if etype == "string_too_short":
+        return f"{label} : au moins {ctx.get('min_length', '?')} caractères."
+    if etype == "string_too_long":
+        return f"{label} : au maximum {ctx.get('max_length', '?')} caractères."
+    if etype in ("bool_parsing", "bool_type"):
+        return f"{label} : valeur oui/non attendue."
+    if etype == "value_error":
+        # Nos validateurs lèvent déjà des messages en français
+        return msg.removeprefix("Value error, ")
+    if etype in ("string_type", "int_type", "dict_type", "model_type"):
+        return f"{label} : format invalide."
+    return f"{label} : valeur invalide."
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_handler(request, exc: RequestValidationError):
+    messages = list(dict.fromkeys(_french_validation_message(e) for e in exc.errors()))
+    return JSONResponse(
+        status_code=422,
+        content={"detail": " ".join(messages), "errors": messages},
+    )
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -131,42 +173,43 @@ def page_scan_detail(request: Request, scan_id: int):
 def page_report(
     request: Request,
     scan_id: int,
-    token: str = "",
+    t: str = "",
     db: Session = Depends(get_db),
 ):
-    """Rapport imprimable. Le token JWT est passé en query param (?token=...)."""
+    """
+    Rapport imprimable, ouvert dans un nouvel onglet via un lien à portée limitée
+    (?t=…) émis par POST /api/scans/{id}/report-link : valable 10 min, pour CE scan
+    uniquement. Le token de session n'est jamais accepté ici, pour qu'il ne finisse
+    pas dans l'historique du navigateur ou les logs.
+    """
     from app.core.security import decode_token
 
-    # Vérifier le token passé en query param (pour les rapports ouverts dans un nouvel onglet)
     user = None
-    error_msg = "Token manquant."
-
-    if token:
-        user_data = decode_token(token)
-        if user_data is not None:
-            try:
-                user_id = int(user_data.get("sub", 0))
-                if user_id:
-                    user = db.query(User).filter(User.id == user_id).first()
-                    if not user:
-                        error_msg = "Utilisateur introuvable."
-                else:
-                    error_msg = "Token invalide (sub manquant)."
-            except (ValueError, TypeError) as e:
-                error_msg = f"Erreur de parsing du token : {e}"
+    error_msg = "Lien de rapport manquant. Ouvrez le rapport depuis la page de l'analyse."
+    data = decode_token(t) if t else None
+    if t and data is None:
+        error_msg = "Ce lien de rapport a expiré. Rouvrez le rapport depuis la page de l'analyse."
+    elif data is not None:
+        if data.get("scope") != "report" or data.get("scan_id") != scan_id:
+            error_msg = "Ce lien n'est pas valide pour ce rapport."
         else:
-            error_msg = "Token expiré ou invalide. Reconnectez-vous et réessayez."
-
-    print(f"[Report] scan_id={scan_id} token={'présent' if token else 'absent'} user={user}")
+            try:
+                user = db.query(User).filter(User.id == int(data.get("sub", 0))).first()
+            except (ValueError, TypeError):
+                user = None
+            if not user:
+                error_msg = "Utilisateur introuvable."
 
     if not user:
         return HTMLResponse(
-            f"<html><body style='font-family:system-ui;padding:2rem;max-width:500px;margin:auto'>"
-            f"<h2 style='color:#dc2626'>Accès refusé</h2>"
+            "<html><head><meta charset='utf-8'><title>Rapport indisponible — SuturaSec</title></head>"
+            "<body style='font-family:system-ui;padding:2rem;max-width:500px;margin:auto'>"
+            "<h2 style='color:#dc2626'>Rapport indisponible</h2>"
             f"<p style='color:#334155'>{error_msg}</p>"
-            f"<a href='/login' style='color:#4f46e5'>Se reconnecter</a>"
-            f"</body></html>",
+            f"<a href='/scans/{scan_id}' style='color:#4f46e5'>Retour à l'analyse</a>"
+            "</body></html>",
             status_code=401,
+            headers={"Referrer-Policy": "no-referrer"},
         )
 
     scan = db.query(Scan).filter(Scan.id == scan_id, Scan.user_id == user.id).first()
@@ -204,7 +247,7 @@ def page_report(
 
     ap = scan.attack_paths or {}
 
-    return templates.TemplateResponse("report.html", {
+    response = templates.TemplateResponse("report.html", {
         "request":         request,
         "scan":            scan,
         "vulnerabilities": vulns,
@@ -222,6 +265,9 @@ def page_report(
         "api":             scan.api_results or None,
         "generated_at":    _dt.utcnow().strftime("%Y-%m-%d %H:%M UTC"),
     })
+    # Le lien (?t=…) ne doit pas fuiter via l'en-tête Referer (polices, CDN…)
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
 
 
 @app.get("/health")

@@ -165,8 +165,8 @@
     <!-- Tagline bottom -->
     <div class="relative z-10 border-t border-white/20 pt-6 mt-8">
       <p class="text-white/40 text-[12px] leading-relaxed">
-        Rejoignez les équipes de sécurité qui font confiance à SuturaSec
-        pour protéger leurs applications.
+        Analysez uniquement les systèmes dont vous êtes propriétaire
+        ou pour lesquels vous disposez d'une autorisation écrite.
       </p>
     </div>
   </div>
@@ -221,8 +221,9 @@
               </svg>
             </div>
             <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Compte créé !</h2>
-            <p class="text-gray-500 text-sm mb-6">Votre espace sécurité est prêt.</p>
-            <a href="/login"
+            <p class="text-gray-500 text-sm mb-6"
+               x-text="autoLoggedIn ? 'Connexion à votre espace…' : 'Votre espace sécurité est prêt.'"></p>
+            <a href="/login" x-show="!autoLoggedIn"
                class="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white
                       bg-gradient-to-r from-indigo-600 to-violet-600
                       hover:from-indigo-500 hover:to-violet-500
@@ -517,6 +518,7 @@ function registerApp() {
     form: { email: '', username: '', password: '', confirm: '' },
     error:       '',
     success:     false,
+    autoLoggedIn: false,
     loading:     false,
     showPwd:     false,
     showConfirm: false,
@@ -577,6 +579,22 @@ function registerApp() {
           return;
         }
         this.success = true;
+        // Connexion automatique : pas besoin de ressaisir ses identifiants
+        try {
+          const login = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              username: this.form.username.trim(),
+              password: this.form.password,
+            }),
+          });
+          if (login.ok) {
+            localStorage.setItem('token', (await login.json()).access_token);
+            this.autoLoggedIn = true;
+            setTimeout(() => { window.location.href = '/dashboard'; }, 900);
+          }
+        } catch { /* repli : bouton « Se connecter » de l'écran de succès */ }
       } catch {
         this.error = 'Erreur réseau — vérifiez votre connexion.';
       } finally {

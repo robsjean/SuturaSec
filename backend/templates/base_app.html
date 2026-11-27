@@ -248,7 +248,8 @@
         <!-- Section: RAPPORTS -->
         <p class="text-[10px] font-bold text-gray-400 dark:text-gray-600 uppercase tracking-[0.14em] px-3 mb-2 mt-5">Rapports</p>
 
-        <a href="/dashboard"
+        <a href="/dashboard?view=rapports"
+           @click="if (window.location.pathname === '/dashboard') { $event.preventDefault(); window.dispatchEvent(new CustomEvent('show-reports')); sidebarOpen = false; }"
            class="sidebar-link flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium
                   text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -291,9 +292,9 @@
             </div>
             <p class="text-xs text-gray-400 truncate" x-text="user?.email || ''"></p>
           </div>
-          <button @click="logout()" title="Déconnexion"
+          <button @click="logout()" title="Déconnexion" aria-label="Déconnexion"
                   class="text-gray-400 hover:text-red-500 dark:hover:text-red-400
-                         opacity-0 group-hover:opacity-100 transition-all duration-150 flex-shrink-0 p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10">
+                         transition-all duration-150 flex-shrink-0 p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
               <polyline points="16 17 21 12 16 7"/>
@@ -368,6 +369,22 @@
     </div>
   </div>
 
+  <!-- ===== TOAST (window.dispatchEvent(new CustomEvent('ss-toast', {detail:{message, type}}))) ===== -->
+  <div x-show="toast" x-cloak role="status" aria-live="polite"
+       x-transition:enter="transition ease-out duration-200"
+       x-transition:enter-start="opacity-0 translate-y-2"
+       x-transition:enter-end="opacity-100 translate-y-0"
+       x-transition:leave="transition ease-in duration-150"
+       x-transition:leave-end="opacity-0"
+       class="fixed bottom-5 right-5 left-5 sm:left-auto z-[60] max-w-sm flex items-start gap-3
+              rounded-xl px-4 py-3 text-sm shadow-xl border
+              bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100">
+    <span class="mt-0.5 w-2 h-2 rounded-full flex-shrink-0"
+          :class="toast?.type === 'error' ? 'bg-red-500' : 'bg-emerald-500'"></span>
+    <span class="flex-1 leading-snug" x-text="toast?.message"></span>
+    <button @click="toast = null" aria-label="Fermer" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">✕</button>
+  </div>
+
   <!-- ===== SCRIPTS ===== -->
   <script>
     function requireAuth() {
@@ -404,8 +421,16 @@
           { name: 'Scan Comparison',      icon: '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>' },
         ],
 
+        toast: null,
+        _toastTimer: null,
+
         async init() {
           requireAuth();
+          window.addEventListener('ss-toast', (e) => {
+            this.toast = { message: e.detail?.message || '', type: e.detail?.type || 'success' };
+            clearTimeout(this._toastTimer);
+            this._toastTimer = setTimeout(() => { this.toast = null; }, 5000);
+          });
           try {
             const res = await apiFetch('/auth/me');
             if (res.ok) this.user = await res.json();

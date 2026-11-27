@@ -92,7 +92,15 @@ export default function ScanDetailPage() {
             )}
             {scan.status === 'completed' && (
               <button
-                onClick={() => window.open(`/scans/${scan.id}/report?token=${localStorage.getItem('token')}`, '_blank')}
+                onClick={async () => {
+                  const win = window.open('', '_blank')
+                  try {
+                    const { data } = await scansApi.reportLink(scan.id)
+                    if (win) win.location.href = data.url
+                  } catch {
+                    if (win) win.close()
+                  }
+                }}
                 className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
               >
                 <FileText size={15} />
