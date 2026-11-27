@@ -31,8 +31,13 @@ export const authApi = {
 }
 
 export const scansApi = {
-  create: (target, scan_type, auth_config = null) =>
-    api.post('/scans', { target, scan_type, ...(auth_config ? { auth_config } : {}) }),
+  create: (target, scan_type, auth_config = null, authorization_confirmed = false) =>
+    api.post('/scans', {
+      target, scan_type, authorization_confirmed,
+      ...(auth_config ? { auth_config } : {}),
+    }),
+  // Lien de rapport à portée limitée (10 min, ce scan uniquement)
+  reportLink: (id) => api.post(`/scans/${id}/report-link`),
   list: () => api.get('/scans'),
   get: (id) => api.get(`/scans/${id}`),
   delete: (id) => api.delete(`/scans/${id}`),

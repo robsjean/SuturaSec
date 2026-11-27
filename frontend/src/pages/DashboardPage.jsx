@@ -32,6 +32,7 @@ export default function DashboardPage() {
   const [form, setForm] = useState({ target: '', scan_type: 'web' })
   const [authForm, setAuthForm] = useState({ login_identifier: '', password: '', login_url: '', provided_token: '' })
   const [showPwd, setShowPwd] = useState(false)
+  const [authorized, setAuthorized] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
@@ -58,6 +59,7 @@ export default function DashboardPage() {
     setAuthForm({ login_identifier: '', password: '', login_url: '', provided_token: '' })
     setError('')
     setShowPwd(false)
+    setAuthorized(false)
   }
 
   const handleSubmit = async (e) => {
@@ -73,7 +75,7 @@ export default function DashboardPage() {
             provided_token: authForm.provided_token || undefined,
           }
         : null
-      await scansApi.create(form.target, form.scan_type, auth_config)
+      await scansApi.create(form.target, form.scan_type, auth_config, authorized)
       resetForm()
       fetchScans()
     } catch (err) {
@@ -241,6 +243,19 @@ export default function DashboardPage() {
                 </div>
               )}
 
+              <label className="flex items-start gap-2.5 rounded-lg border border-amber-900/50 bg-amber-950/20 px-3 py-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={authorized}
+                  onChange={(e) => setAuthorized(e.target.checked)}
+                  required
+                  className="mt-0.5 accent-indigo-600"
+                />
+                <span className="text-xs text-gray-300 leading-relaxed">
+                  Je certifie être propriétaire de cette cible ou disposer d'une autorisation écrite pour l'analyser.
+                </span>
+              </label>
+
               <div className="flex gap-3 pt-1">
                 <button
                   type="button"
@@ -251,7 +266,7 @@ export default function DashboardPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={submitting}
+                  disabled={submitting || !authorized}
                   className="flex-1 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium transition-colors"
                 >
                   {submitting ? 'Lancement...' : 'Lancer le scan'}

@@ -188,28 +188,20 @@
       </div>
     </div>
 
-    <!-- Stats -->
+    <!-- Faits produit (vérifiables — pas de statistiques d'usage inventées) -->
     <div class="relative z-10 border-t border-white/20 pt-7 mt-8">
       <div class="grid grid-cols-3 gap-4">
         <div>
-          <p class="text-[1.5rem] font-bold text-white tabular-nums"
-             x-data="{n:0}"
-             x-init="$nextTick(()=>{let i=setInterval(()=>{n=Math.min(n+53,2847);if(n>=2847)clearInterval(i)},14)})">
-            <span x-text="n.toLocaleString('fr-FR')">0</span>
-          </p>
-          <p class="text-[10.5px] text-white/45 mt-0.5">Scans réalisés</p>
+          <p class="text-[1.5rem] font-bold text-white tabular-nums">7</p>
+          <p class="text-[10.5px] text-white/45 mt-0.5">Modules d'analyse</p>
         </div>
         <div>
-          <p class="text-[1.5rem] font-bold text-amber-300 tabular-nums"
-             x-data="{n:0}"
-             x-init="$nextTick(()=>{let i=setInterval(()=>{n=Math.min(n+7,342);if(n>=342)clearInterval(i)},18)})">
-            <span x-text="n">0</span>
-          </p>
-          <p class="text-[10.5px] text-white/45 mt-0.5">Vulnérabilités</p>
+          <p class="text-[1.5rem] font-bold text-amber-300 tabular-nums">4</p>
+          <p class="text-[10.5px] text-white/45 mt-0.5">Référentiels de conformité</p>
         </div>
         <div>
-          <p class="text-[1.5rem] font-bold text-emerald-300">99.9%</p>
-          <p class="text-[10.5px] text-white/45 mt-0.5">Disponibilité</p>
+          <p class="text-[1.5rem] font-bold text-emerald-300">FR</p>
+          <p class="text-[10.5px] text-white/45 mt-0.5">Rapports en français</p>
         </div>
       </div>
     </div>
@@ -309,7 +301,7 @@
                   </svg>
                 </div>
                 <input id="login-user" type="text" x-model="form.username" required
-                       autocomplete="username" placeholder="votre_username"
+                       autocomplete="username" placeholder="Nom d'utilisateur ou email"
                        class="sec-input w-full pl-10 pr-4 py-3 rounded-xl text-sm
                               text-gray-900 dark:text-white
                               bg-gray-50 dark:bg-white/[0.05]
@@ -327,12 +319,19 @@
                               uppercase tracking-[0.12em]">
                   Mot de passe
                 </label>
-                <a href="#"
-                   class="text-[11.5px] text-indigo-500 dark:text-indigo-400/80
-                          hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors">
+                <button type="button" @click="showForgot = !showForgot"
+                        :aria-expanded="showForgot"
+                        class="text-[11.5px] text-indigo-500 dark:text-indigo-400/80
+                               hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors">
                   Oublié ?
-                </a>
+                </button>
               </div>
+              <p x-show="showForgot" x-cloak
+                 class="text-[12px] leading-snug text-gray-600 dark:text-gray-400 mb-2 rounded-lg px-3 py-2
+                        bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20">
+                La réinitialisation en ligne n'est pas encore disponible. Contactez l'administrateur
+                de votre espace SuturaSec pour obtenir un nouveau mot de passe.
+              </p>
               <div class="relative">
                 <div class="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-600 pointer-events-none">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -425,6 +424,7 @@ function loginApp() {
     error:   '',
     loading: false,
     showPwd: false,
+    showForgot: false,
     shaking: false,
 
     async submit() {
@@ -434,6 +434,7 @@ function loginApp() {
         const body = new URLSearchParams({
           username: this.form.username.trim(),
           password: this.form.password,
+          remember: this.form.remember ? 'true' : 'false',
         });
         const res = await fetch('/api/auth/login', {
           method:  'POST',

@@ -15,6 +15,34 @@ from app.services.auth import get_current_user
 router = APIRouter(prefix="/api/scans", tags=["scans"])
 
 
+class _ScanAborted(Exception):
+    """
+    La cible n'a pas pu être analysée (injoignable, authentification impossible…).
+    Le scan doit échouer avec ce message, et non se terminer « sain » avec 0 vulnérabilité.
+    """
+
+
+def _ensure_http_reachable(url: str, timeout: float = 10.0) -> None:
+    """Vérifie qu'une cible HTTP répond (n'importe quel code HTTP compte comme une réponse)."""
+    import httpx
+    try:
+        httpx.get(url, timeout=timeout, verify=False, follow_redirects=True)
+    except httpx.TimeoutException:
+        raise _ScanAborted(
+            f"La cible {url} n'a pas répondu dans le délai imparti ({int(timeout)} s). "
+            "Aucune analyse n'a pu être effectuée."
+        )
+    except httpx.ConnectError:
+        raise _ScanAborted(
+            f"Connexion impossible à {url} (hôte hors ligne ou port fermé). "
+            "Aucune analyse n'a pu être effectuée."
+        )
+    except httpx.HTTPError as e:
+        raise _ScanAborted(
+            f"La cible {url} n'a pas pu être contactée : {e}. Aucune analyse n'a pu être effectuée."
+        )
+
+
 def _run_scan(
     scan_id: int,
     db_url: str,
@@ -47,9 +75,31 @@ def _run_scan(
         if scan.scan_type == "web":
             scanner = WebScanner(scan.target)
             findings = scanner.run()
+            # Cible injoignable : échec explicite plutôt qu'un faux « 0 vulnérabilité »
+            if findings and all(f.category == "Connectivity" for f in findings):
+                raise _ScanAborted(
+                    f"La cible {scan.target} n'a pas répondu. Aucune analyse n'a pu être "
+                    f"effectuée. Détail : {findings[0].description}"
+                )
         elif scan.scan_type == "network":
+            from app.scanners.network_scanner import COMMON_PORTS
             scanner = NetworkScanner(scan.target)
             findings = scanner.run()
+            if scanner.hosts_scanned == 0:
+                raise _ScanAborted(
+                    f"La cible {scan.target} n'a pas pu être résolue. Aucune analyse n'a pu être effectuée."
+                )
+            if scanner.reachable_hosts == 0:
+                n = len(COMMON_PORTS)
+                what = (
+                    f"Aucun des {scanner.hosts_scanned} hôtes de {scan.target} n'a répondu sur les {n} ports testés"
+                    if scanner.hosts_scanned > 1 else
+                    f"{scan.target} n'a répondu sur aucun des {n} ports testés"
+                )
+                raise _ScanAborted(
+                    f"{what} : cible hors ligne ou pare-feu filtrant toutes les connexions. "
+                    "Aucune analyse n'a pu être effectuée."
+                )
         elif scan.scan_type == "cti":
             from app.scanners.cti_scanner import CTIScanner
             from app.config import settings as cfg
@@ -66,12 +116,14 @@ def _run_scan(
             scan.subdomain_results = subdomain_results
         elif scan.scan_type == "api":
             from app.scanners.api_scanner import APIScanner
+            _ensure_http_reachable(scan.target)
             api_scanner = APIScanner(scan.target)
             findings, api_results = api_scanner.run()
             scan.api_results = api_results
         elif scan.scan_type == "authenticated_web":
             from app.scanners.auth_handler import UniversalAuthHandler
             from app.scanners.authenticated_scanner import AuthenticatedScanner
+            _ensure_http_reachable(scan.target)
             handler = UniversalAuthHandler(
                 target=scan.target,
                 login_identifier=auth_login,
@@ -87,6 +139,20 @@ def _run_scan(
                 "token_type": auth_session.token_type,
                 "is_jwt": auth_session.is_jwt,
             }
+            if not auth_session.success:
+                # Sans session valide, aucun test authentifié n'est exécuté : on échoue
+                # explicitement au lieu de produire un rapport quasi vide.
+                if auth_session.client:
+                    try:
+                        auth_session.client.close()
+                    except Exception:
+                        pass
+                raise _ScanAborted(
+                    "Connexion à l'application impossible avec les identifiants fournis : "
+                    "aucune analyse authentifiée n'a pu être effectuée. Vérifiez l'identifiant, "
+                    "le mot de passe et l'URL de login (ou fournissez un token Bearer). "
+                    f"Détail : {auth_session.error or 'aucune stratégie de connexion n’a abouti'}"
+                )
             auth_scanner = AuthenticatedScanner(scan.target, auth_session)
             findings = auth_scanner.run()
             # Clean up HTTP client
@@ -148,7 +214,7 @@ def _run_scan(
         scan = db.query(Scan).filter(Scan.id == scan_id).first()
         if scan:
             scan.status = "failed"
-            scan.summary = f"Erreur durant le scan : {str(e)}"
+            scan.summary = str(e) if isinstance(e, _ScanAborted) else f"Erreur durant le scan : {str(e)}"
             db.commit()
     finally:
         db.close()
@@ -165,16 +231,37 @@ def create_scan(
     if scan_data.scan_type not in VALID_TYPES:
         raise HTTPException(status_code=400, detail=f"scan_type doit être l'un de : {', '.join(VALID_TYPES)}")
 
+    if not scan_data.authorization_confirmed:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Vous devez certifier être propriétaire de la cible ou disposer d'une "
+                "autorisation écrite pour l'analyser."
+            ),
+        )
+
     if scan_data.scan_type == "authenticated_web":
-        if not scan_data.auth_config or not scan_data.auth_config.login_identifier:
+        ac_in = scan_data.auth_config
+        has_token = bool(ac_in and (ac_in.provided_token or "").strip())
+        has_creds = bool(ac_in and ac_in.login_identifier.strip() and ac_in.password)
+        if not (has_token or has_creds):
             raise HTTPException(
                 status_code=400,
-                detail="auth_config (login_identifier + password) requis pour un scan authentifié",
+                detail=(
+                    "Pour une analyse authentifiée, renseignez l'identifiant et le mot de passe, "
+                    "ou un token Bearer existant."
+                ),
             )
+
+    from app.services.target_validation import normalize_target, InvalidTarget
+    try:
+        target = normalize_target(scan_data.scan_type, scan_data.target)
+    except InvalidTarget as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     scan = Scan(
         user_id=current_user.id,
-        target=scan_data.target,
+        target=target,
         scan_type=scan_data.scan_type,
         status="pending",
     )
@@ -236,6 +323,27 @@ def get_scan(scan_id: int, db: Session = Depends(get_db), current_user: User = D
     if not scan:
         raise HTTPException(status_code=404, detail="Scan introuvable")
     return scan
+
+
+@router.post("/{scan_id}/report-link")
+def create_report_link(scan_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """
+    Lien d'ouverture du rapport dans un nouvel onglet. Le token inclus est limité à ce
+    scan et expire en 10 min : il ne donne accès ni à l'API ni aux autres rapports.
+    """
+    from datetime import timedelta
+    from app.core.security import create_access_token
+
+    scan = db.query(Scan).filter(Scan.id == scan_id, Scan.user_id == current_user.id).first()
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan introuvable")
+    if scan.status != "completed":
+        raise HTTPException(status_code=400, detail="Le rapport sera disponible une fois l'analyse terminée.")
+    token = create_access_token(
+        {"sub": str(current_user.id), "scope": "report", "scan_id": scan_id},
+        expires_delta=timedelta(minutes=10),
+    )
+    return {"url": f"/scans/{scan_id}/report?t={token}"}
 
 
 @router.delete("/{scan_id}", status_code=204)

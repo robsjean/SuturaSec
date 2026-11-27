@@ -49,6 +49,11 @@ _HEADERS = {
 }
 
 # Patterns d'erreurs SQL par technologie
+_SOFT_404_PATTERNS = re.compile(
+    r"404|page not found|not found|introuvable|n'existe pas|does not exist|doesn't exist|no encontrado|no such|page introuvable",
+    re.IGNORECASE,
+)
+
 _SQL_ERROR_PATTERNS = [
     r"SQL syntax.*MySQL",
     r"Warning.*mysql_",
@@ -84,6 +89,34 @@ class WebScanner:
         self.timeout = timeout
         self.findings: List[Finding] = []
         self._response: Optional[httpx.Response] = None
+        self._soft_404_len: Optional[int] = None
+
+    # ------------------------------------------------------------------
+    # Helpers anti-faux-positifs
+    # ------------------------------------------------------------------
+
+    def _compute_soft_404_fingerprint(self):
+        """Sonde un chemin inexistant pour fingerprinter les réponses soft-404 (200 sur 404)."""
+        try:
+            r = httpx.get(
+                f"{self.parsed.scheme}://{self.parsed.netloc}/_x7z9_suturasec_nonexistent_page_/",
+                headers=_HEADERS, follow_redirects=True, timeout=self.timeout, verify=False,
+            )
+            if r.status_code == 200:
+                self._soft_404_len = len(r.text)
+        except Exception:
+            pass
+
+    def _is_false_positive_200(self, r: httpx.Response) -> bool:
+        """Retourne True si un HTTP 200 est probablement un soft-404 ou une page vide."""
+        body = r.text
+        if len(body.strip()) < 20:
+            return True
+        if self._soft_404_len is not None and abs(len(body) - self._soft_404_len) < 150:
+            return True
+        if _SOFT_404_PATTERNS.search(body[:800]):
+            return True
+        return False
 
     # ------------------------------------------------------------------
     # Point d'entrée
@@ -119,6 +152,7 @@ class WebScanner:
             ))
             return self.findings
 
+        self._compute_soft_404_fingerprint()
         self._check_https_enforcement()
         self._check_ssl_certificate()
         self._check_security_headers()
@@ -469,17 +503,45 @@ class WebScanner:
             url = base + path
             try:
                 r = httpx.get(url, headers=_HEADERS, follow_redirects=False, timeout=self.timeout, verify=False)
-                if r.status_code == 200:
-                    preview = r.text[:200].strip().replace("\n", " ")
-                    self.findings.append(Finding(
-                        title=f"Fichier/ressource sensible accessible : {path}",
-                        severity=severity,
-                        category=category,
-                        description=description,
-                        evidence=f"GET {url} → 200 OK\nContenu : {preview}",
-                        remediation=f"Bloquer l'accès à {path} via la configuration serveur ou .htaccess.",
-                        cvss_score=cvss,
-                    ))
+                if r.status_code != 200:
+                    continue
+
+                # Filtre soft-404 : contenu identique à une page 404 custom
+                if self._is_false_positive_200(r):
+                    continue
+
+                ct = r.headers.get("content-type", "").lower()
+                body = r.text
+
+                # Les fichiers de config/données ne devraient pas renvoyer du HTML
+                ext = path.rsplit(".", 1)[-1] if "." in path else ""
+                if ext in ("env", "sql", "log", "bak", "yml", "yaml") and "text/html" in ct:
+                    continue
+
+                # .env : doit contenir au moins une variable KEY=VALUE
+                if path.endswith(".env") or ".env." in path:
+                    if not re.search(r"^[A-Z_][A-Z0-9_]*=", body, re.MULTILINE):
+                        continue
+
+                # .git/HEAD : doit ressembler à une référence git
+                if path == "/.git/HEAD":
+                    if not re.match(r"(ref:|[0-9a-f]{40})", body.strip()):
+                        continue
+
+                # Fichiers PHP : doivent contenir du code PHP ou des données réelles (pas juste du HTML)
+                if path.endswith(".php") and "<?php" not in body and "phpinfo" not in body.lower():
+                    continue
+
+                preview = body[:200].strip().replace("\n", " ")
+                self.findings.append(Finding(
+                    title=f"Fichier/ressource sensible accessible : {path}",
+                    severity=severity,
+                    category=category,
+                    description=description,
+                    evidence=f"GET {url} → 200 OK\nContenu : {preview}",
+                    remediation=f"Bloquer l'accès à {path} via la configuration serveur ou .htaccess.",
+                    cvss_score=cvss,
+                ))
             except Exception:
                 pass
 
@@ -492,16 +554,31 @@ class WebScanner:
         for method in dangerous:
             try:
                 r = httpx.request(method, self.target, headers=_HEADERS, timeout=self.timeout, verify=False)
-                if r.status_code not in (405, 501, 403):
-                    self.findings.append(Finding(
-                        title=f"Méthode HTTP dangereuse autorisée : {method}",
-                        severity="medium" if method == "TRACE" else "high",
-                        category="A05 – Security Misconfiguration",
-                        description=f"La méthode {method} est acceptée par le serveur, ce qui peut permettre des modifications non autorisées ou des attaques Cross-Site Tracing.",
-                        evidence=f"{method} {self.target} → HTTP {r.status_code}",
-                        remediation=f"Désactiver la méthode {method} dans la configuration du serveur web.",
-                        cvss_score=6.5 if method == "TRACE" else 7.5,
-                    ))
+                if r.status_code in (405, 501, 403):
+                    continue
+
+                if method == "TRACE":
+                    # TRACE n'est dangereux (XST) que s'il réfléchit réellement les headers de la requête
+                    probe_val = "suturasec-xst-probe-8k2m"
+                    r2 = httpx.request(
+                        "TRACE", self.target,
+                        headers={**_HEADERS, "X-Suturasec-Probe": probe_val},
+                        timeout=self.timeout, verify=False,
+                    )
+                    if probe_val not in r2.text:
+                        continue  # TRACE accepté mais sans réflexion des headers — risque nul
+                elif r.status_code in (301, 302, 307, 308):
+                    continue  # Redirection (vers login ou page d'erreur) — pas dangereux
+
+                self.findings.append(Finding(
+                    title=f"Méthode HTTP dangereuse autorisée : {method}",
+                    severity="medium" if method == "TRACE" else "high",
+                    category="A05 – Security Misconfiguration",
+                    description=f"La méthode {method} est acceptée par le serveur, ce qui peut permettre des modifications non autorisées ou des attaques Cross-Site Tracing.",
+                    evidence=f"{method} {self.target} → HTTP {r.status_code}",
+                    remediation=f"Désactiver la méthode {method} dans la configuration du serveur web.",
+                    cvss_score=6.5 if method == "TRACE" else 7.5,
+                ))
             except Exception:
                 pass
 
@@ -619,8 +696,8 @@ class WebScanner:
 
     def _check_sql_injection(self):
         """
-        Injecte des payloads SQLi dans les paramètres GET existants ou des
-        paramètres tests communs. Détecte les erreurs SQL reflétées dans la réponse.
+        Injecte des payloads SQLi uniquement dans les paramètres GET existants dans l'URL.
+        Compare chaque réponse à une baseline pour éliminer les erreurs pré-existantes.
         """
         if not self._response:
             return
@@ -628,15 +705,27 @@ class WebScanner:
         base_url = f"{self.parsed.scheme}://{self.parsed.netloc}{self.parsed.path}"
         existing_params = parse_qs(self.parsed.query)
 
-        # Paramètres à tester : ceux déjà dans l'URL + paramètres courants
-        test_params = list(existing_params.keys()) or ["id", "page", "q", "search", "cat", "item", "product", "user"]
+        # Uniquement les paramètres réellement présents dans l'URL — pas de devinettes
+        if not existing_params:
+            return
 
-        sqli_payloads = ["'", "''", "`", "\"", "1' OR '1'='1", "1; SELECT 1--", "' OR 1=1--"]
-
+        sqli_payloads = ["'", "''", "1' OR '1'='1"]
         already_reported = False
 
-        for param in test_params[:3]:  # Limiter le nombre de requêtes
-            for payload in sqli_payloads[:3]:
+        for param in list(existing_params.keys())[:3]:
+            if already_reported:
+                break
+
+            original_val = existing_params[param][0] if existing_params[param] else "1"
+            try:
+                baseline = httpx.get(
+                    f"{base_url}?{param}={original_val}",
+                    headers=_HEADERS, timeout=self.timeout, verify=False,
+                )
+            except Exception:
+                baseline = None
+
+            for payload in sqli_payloads:
                 if already_reported:
                     break
                 try:
@@ -645,24 +734,28 @@ class WebScanner:
                     body = r.text
 
                     for pattern in _SQL_ERROR_PATTERNS:
-                        if re.search(pattern, body, re.IGNORECASE):
-                            self.findings.append(Finding(
-                                title="Injection SQL potentielle détectée",
-                                severity="critical",
-                                category="A03 – Injection",
-                                description=(
-                                    "Une erreur SQL a été reflétée dans la réponse HTTP suite à l'injection d'un payload. "
-                                    "Cela indique une vulnérabilité d'injection SQL pouvant permettre l'accès ou la destruction de la base de données."
-                                ),
-                                evidence=f"Payload : {payload!r}\nURL : {test_url}\nErreur SQL détectée (pattern: {pattern})",
-                                remediation=(
-                                    "Utiliser des requêtes préparées (Prepared Statements) ou un ORM. "
-                                    "Ne jamais concaténer directement les entrées utilisateur dans les requêtes SQL."
-                                ),
-                                cvss_score=9.8,
-                            ))
-                            already_reported = True
-                            break
+                        if not re.search(pattern, body, re.IGNORECASE):
+                            continue
+                        # Vérifier que l'erreur N'existe PAS dans la baseline (élimine les erreurs génériques)
+                        if baseline and re.search(pattern, baseline.text, re.IGNORECASE):
+                            continue
+                        self.findings.append(Finding(
+                            title="Injection SQL potentielle détectée",
+                            severity="critical",
+                            category="A03 – Injection",
+                            description=(
+                                "Une erreur SQL a été reflétée dans la réponse HTTP suite à l'injection d'un payload. "
+                                "Cela indique une vulnérabilité d'injection SQL pouvant permettre l'accès ou la destruction de la base de données."
+                            ),
+                            evidence=f"Payload : {payload!r}\nURL : {test_url}\nErreur SQL détectée (pattern: {pattern})",
+                            remediation=(
+                                "Utiliser des requêtes préparées (Prepared Statements) ou un ORM. "
+                                "Ne jamais concaténer directement les entrées utilisateur dans les requêtes SQL."
+                            ),
+                            cvss_score=9.8,
+                        ))
+                        already_reported = True
+                        break
                 except Exception:
                     pass
 
@@ -672,30 +765,42 @@ class WebScanner:
 
     def _check_xss_reflection(self):
         """
-        Teste la réflexion de payloads XSS dans les paramètres GET.
-        Détecte uniquement le XSS réfléchi non encodé (pas DOM-based).
+        Teste la réflexion de payloads XSS uniquement dans les paramètres GET existants.
+        Compare à une baseline pour éviter les faux positifs sur du contenu déjà présent.
         """
         if not self._response:
             return
 
         base_url = f"{self.parsed.scheme}://{self.parsed.netloc}{self.parsed.path}"
         existing_params = parse_qs(self.parsed.query)
-        test_params = list(existing_params.keys()) or ["q", "search", "query", "name", "s", "keyword", "input"]
+
+        # Uniquement les paramètres réellement présents dans l'URL — pas de devinettes
+        if not existing_params:
+            return
 
         xss_marker = "suturasec_xss_probe_7f3a"
         xss_payload = f'"><script>{xss_marker}</script>'
-
         already_reported = False
 
-        for param in test_params[:3]:
+        for param in list(existing_params.keys())[:3]:
             if already_reported:
                 break
+            original_val = existing_params[param][0] if existing_params[param] else "test"
             try:
+                # Baseline : s'assurer que le marqueur n'est pas déjà dans la page
+                baseline = httpx.get(
+                    f"{base_url}?{param}={original_val}",
+                    headers=_HEADERS, timeout=self.timeout, verify=False,
+                )
+                if xss_marker in baseline.text:
+                    continue
+
                 test_url = f"{base_url}?{param}={xss_payload}"
                 r = httpx.get(test_url, headers=_HEADERS, timeout=self.timeout, verify=False)
 
-                # Vérifier si le payload est reflété non encodé
-                if xss_marker in r.text and "<script>" in r.text:
+                ct = r.headers.get("content-type", "").lower()
+                # Vérifie : marqueur non encodé, dans un contexte HTML (pas JSON/XML)
+                if xss_marker in r.text and "<script>" in r.text and "text/html" in ct:
                     self.findings.append(Finding(
                         title="XSS Réfléchi potentiel détecté",
                         severity="high",
@@ -769,7 +874,7 @@ class WebScanner:
 
         responses = []
         try:
-            for _ in range(10):
+            for _ in range(15):
                 r = httpx.get(self.target, headers=_HEADERS, timeout=self.timeout, verify=False)
                 responses.append(r.status_code)
         except Exception:
@@ -780,21 +885,23 @@ class WebScanner:
         has_header_protection = self._response and (
             "x-ratelimit-limit" in {k.lower() for k in self._response.headers}
             or "retry-after" in {k.lower() for k in self._response.headers}
+            or "x-rate-limit" in {k.lower() for k in self._response.headers}
         )
 
         if not rate_limited and not has_header_protection:
             self.findings.append(Finding(
-                title="Absence de rate limiting détectée",
+                title="Absence de rate limiting détectée au niveau applicatif",
                 severity="medium",
                 category="A05 – Security Misconfiguration",
                 description=(
-                    "Le serveur n'applique pas de rate limiting visible (aucun HTTP 429 reçu après 10 requêtes rapides, "
-                    "aucun header X-RateLimit-Limit). Cela expose le site aux attaques par force brute et DoS applicatif."
+                    "Le serveur n'applique pas de rate limiting visible (aucun HTTP 429 reçu après 15 requêtes rapides, "
+                    "aucun header X-RateLimit-*). Cela expose le site aux attaques par force brute et DoS applicatif. "
+                    "Note : un rate limiting CDN/WAF (Cloudflare, AWS WAF, Nginx upstream) peut ne pas être détectable par ce test."
                 ),
-                evidence=f"10 requêtes envoyées → statuts : {responses}. Aucun 429 reçu.",
+                evidence=f"15 requêtes envoyées → statuts : {responses}. Aucun 429 reçu.",
                 remediation=(
-                    "Implémenter un rate limiting (ex : nginx limit_req, fail2ban, Cloudflare, "
-                    "ou middleware Express/FastAPI rate-limiter). Retourner HTTP 429 avec Retry-After."
+                    "Implémenter un rate limiting applicatif (ex : nginx limit_req, fail2ban, "
+                    "ou middleware FastAPI rate-limiter). Retourner HTTP 429 avec header Retry-After."
                 ),
                 cvss_score=5.3,
             ))

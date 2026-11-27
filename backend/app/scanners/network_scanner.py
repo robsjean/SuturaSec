@@ -127,7 +127,12 @@ class NetworkScanner:
     # ------------------------------------------------------------------
 
     def run(self) -> List[Finding]:
+        # Nombre d'hôtes résolus / ayant au moins un port ouvert — lu par le router
+        # pour faire échouer le scan si rien n'a répondu (évite un faux « 0 vulnérabilité »).
+        self.hosts_scanned = 0
+        self.reachable_hosts = 0
         hosts = self._resolve_targets()
+        self.hosts_scanned = len(hosts)
         if not hosts:
             self.findings.append(Finding(
                 title="Cible réseau invalide",
@@ -194,6 +199,8 @@ class NetworkScanner:
                 remediation="Vérifiez que la cible est en ligne et accessible.",
             ))
             return
+
+        self.reachable_hosts += 1
 
         # Résumé des ports ouverts
         open_list = ", ".join(

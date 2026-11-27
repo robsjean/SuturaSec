@@ -13,6 +13,7 @@ class AuthStrategy(str, Enum):
     AUTO = "auto"
     FORM_HTML = "form_html"
     JSON_API = "json_api"
+    FORM_ENCODED = "form_urlencoded"
     BASIC = "basic"
     PROVIDED_TOKEN = "token"
 
@@ -28,6 +29,12 @@ class AuthSession:
     is_jwt: bool = False
     jwt_payload: Optional[dict] = None
     login_url_used: str = ""
+    # Format de la requête de login qui a fonctionné — réutilisé par les checks
+    # (rate limiting, bypass SQLi) pour tester le vrai endpoint dans le bon format.
+    login_encoding: str = ""                 # "json" | "form" | "" (inconnu)
+    login_id_field: str = ""                 # ex. "username", "email"
+    login_pwd_field: str = ""                # ex. "password"
+    login_extra: dict = field(default_factory=dict)   # ex. {"grant_type": "password"}
     error: Optional[str] = None
     client: Optional[object] = field(default=None, repr=False)
 
@@ -131,7 +138,8 @@ def _auth_succeeded(response: httpx.Response) -> bool:
 class UniversalAuthHandler:
     """
     Auto-detects and handles all common web authentication flows:
-    HTML form login, JSON REST API, HTTP Basic Auth, pre-provided token.
+    HTML form login, JSON REST API, form-urlencoded API (OAuth2 password flow),
+    HTTP Basic Auth, pre-provided token.
     """
 
     _LOGIN_PATHS = [
@@ -176,14 +184,21 @@ class UniversalAuthHandler:
     def authenticate(self) -> AuthSession:
         if self.provided_token:
             return self._use_token()
-        for strategy_fn in (self._try_form, self._try_json, self._try_basic):
+        specific_error: Optional[str] = None
+        for strategy_fn in (self._try_form, self._try_json, self._try_form_encoded, self._try_basic):
             session = strategy_fn()
             if session.success:
                 return session
+            # Garder une erreur précise (ex. « identifiants refusés par … ») plutôt que générique
+            if session.error and session.strategy != AuthStrategy.BASIC and not specific_error:
+                specific_error = session.error
         return AuthSession(
             success=False,
             strategy=AuthStrategy.AUTO,
-            error="All authentication strategies failed",
+            error=specific_error or (
+                "aucune des stratégies testées (formulaire HTML, API JSON, "
+                "formulaire encodé, HTTP Basic) n'a abouti"
+            ),
             client=self._client,
         )
 
@@ -264,7 +279,16 @@ class UniversalAuthHandler:
                         else self._client.post(form_url, data=data)
                     )
                     if _auth_succeeded(resp):
-                        return self._build_session(resp, AuthStrategy.FORM_HTML, form_url)
+                        session = self._build_session(resp, AuthStrategy.FORM_HTML, form_url)
+                        if form["method"] != "GET":
+                            # Les champs cachés (jeton CSRF…) ne sont pas réutilisables : on ne
+                            # garde que les noms des champs identifiant / mot de passe.
+                            session.login_encoding = "form"
+                            session.login_pwd_field = next(
+                                (k for k, v in data.items() if v == self.password), "password")
+                            session.login_id_field = next(
+                                (k for k, v in data.items() if v == self.login_identifier), "username")
+                        return session
                 except Exception:
                     continue
 
@@ -285,18 +309,90 @@ class UniversalAuthHandler:
                 try:
                     resp = self._client.post(ep, json=payload, headers=hdrs)
                     if resp.status_code in (200, 201) and _auth_succeeded(resp):
-                        return self._build_session(resp, AuthStrategy.JSON_API, ep)
+                        session = self._build_session(resp, AuthStrategy.JSON_API, ep)
+                        session.login_encoding = "json"
+                        session.login_id_field, session.login_pwd_field = id_key, pwd_key
+                        return session
                 except Exception:
                     continue
 
         return AuthSession(success=False, strategy=AuthStrategy.JSON_API, client=self._client)
 
+    # Variantes de champs pour un POST application/x-www-form-urlencoded.
+    # La première suit le flux OAuth2 « password » (RFC 6749 §4.3), utilisé par
+    # FastAPI (OAuth2PasswordRequestForm), Django OAuth Toolkit, Spring Security…
+    _FORM_ENCODED_FIELDS = [
+        {"grant_type": "password", "username": None, "password": None},
+        {"username": None, "password": None},
+        {"email": None, "password": None},
+        {"login": None, "password": None},
+    ]
+
+    def _try_form_encoded(self) -> AuthSession:
+        """
+        POST x-www-form-urlencoded sur les endpoints de login d'API (sans formulaire HTML).
+
+        Plus strict que _auth_succeeded : on exige un token dans la réponse ou un cookie
+        de session, car beaucoup d'applications (SPA notamment) répondent 200 à
+        n'importe quel POST, ce qui donnerait une fausse session.
+        """
+        endpoints: list[str] = []
+        if self.login_url:
+            endpoints.append(
+                self.login_url if "://" in self.login_url else self.target + self.login_url
+            )
+        endpoints += [self.target + p for p in self._LOGIN_PATHS if self.target + p not in endpoints]
+
+        hdrs = {"Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"}
+        for ep in endpoints:
+            for template in self._FORM_ENCODED_FIELDS:
+                data = {
+                    k: (v if v is not None else (self.password if k == "password" else self.login_identifier))
+                    for k, v in template.items()
+                }
+                try:
+                    resp = self._client.post(ep, data=data, headers=hdrs)
+                except Exception:
+                    break  # endpoint injoignable : inutile d'essayer les autres variantes
+                if resp.status_code in (404, 405):
+                    break  # l'endpoint n'existe pas ou n'accepte pas POST
+                if resp.status_code in (401, 403, 429):
+                    # L'endpoint a compris la requête et refusé les identifiants (ou bloque).
+                    # On s'arrête pour ne pas multiplier les échecs et verrouiller le compte.
+                    reason = (
+                        "trop de tentatives, compte ou IP temporairement bloqué"
+                        if resp.status_code == 429 else "identifiants refusés"
+                    )
+                    return AuthSession(
+                        success=False, strategy=AuthStrategy.FORM_ENCODED, client=self._client,
+                        login_url_used=ep, error=f"{reason} par {ep} (HTTP {resp.status_code})",
+                    )
+                if resp.status_code not in (200, 201) or not _auth_succeeded(resp):
+                    continue
+                cookie_hdr = resp.headers.get("set-cookie", "").lower()
+                has_session_cookie = any(s in cookie_hdr for s in ("session", "token", "auth", "jwt"))
+                if _extract_token(resp) or has_session_cookie:
+                    session = self._build_session(resp, AuthStrategy.FORM_ENCODED, ep)
+                    session.login_encoding = "form"
+                    session.login_id_field = next(k for k in template if k not in ("password", "grant_type"))
+                    session.login_pwd_field = "password"
+                    session.login_extra = {k: v for k, v in template.items() if v is not None}
+                    return session
+
+        return AuthSession(success=False, strategy=AuthStrategy.FORM_ENCODED, client=self._client)
+
     def _try_basic(self) -> AuthSession:
         cred = base64.b64encode(f"{self.login_identifier}:{self.password}".encode()).decode()
         hdr = {"Authorization": f"Basic {cred}"}
         try:
+            # Basic Auth n'a de sens que si la cible l'exige : sans identifiants elle doit
+            # répondre 401 (sinon une page publique en 200 ferait croire à un succès).
+            anon = self._client.get(self.target)
+            if anon.status_code != 401:
+                return AuthSession(success=False, strategy=AuthStrategy.BASIC, client=self._client,
+                                   error="La cible n'exige pas d'authentification HTTP Basic")
             r = self._client.get(self.target, headers=hdr)
-            if r.status_code == 200:
+            if 200 <= r.status_code < 300:
                 self._client.headers.update(hdr)
                 return AuthSession(
                     success=True,

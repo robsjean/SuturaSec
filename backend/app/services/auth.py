@@ -18,6 +18,9 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     payload = decode_token(token)
     if payload is None:
         raise credentials_exception
+    # Les tokens à portée limitée (ex. lien de rapport) ne valent pas session API
+    if payload.get("scope"):
+        raise credentials_exception
 
     user_id: int = payload.get("sub")
     if user_id is None:
