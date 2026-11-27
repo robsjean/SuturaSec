@@ -5,9 +5,13 @@ import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
 import ScanDetailPage from './pages/ScanDetailPage'
 
+function FullPageLoading() {
+  return <div className="loading" style={{ minHeight: '100vh' }}><span className="spinner" aria-hidden="true" />Chargement…</div>
+}
+
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
-  if (loading) return <div className="flex h-screen items-center justify-center text-gray-400">Chargement...</div>
+  if (loading) return <FullPageLoading />
   return user ? children : <Navigate to="/login" replace />
 }
 

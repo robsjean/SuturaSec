@@ -11,7 +11,10 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) {
+    // Un 401 sur /auth/login signifie « identifiants incorrects » : on laisse
+    // la page de connexion afficher l'erreur au lieu de la recharger.
+    const isLogin = err.config?.url?.startsWith('/auth/login')
+    if (err.response?.status === 401 && !isLogin) {
       localStorage.removeItem('token')
       window.location.href = '/login'
     }
