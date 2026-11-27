@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     # Nombre de proxys de confiance devant l'app (Railway = 1). Sert à lire la vraie IP
     # client dans X-Forwarded-For pour le rate limiting. -1 = auto (1 si Railway, sinon 0).
     TRUSTED_PROXY_HOPS: int = -1
+    # Autorise les cibles privées/locales (127.0.0.1, 10.x, 192.168.x…). À n'activer
+    # qu'en développement local : en production, cela exposerait le réseau interne (SSRF).
+    ALLOW_PRIVATE_TARGETS: bool = False
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

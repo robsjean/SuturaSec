@@ -539,7 +539,9 @@ class SubdomainScanner:
 
     def _try_axfr(self, ns_name: str) -> bool:
         try:
-            ns_ip = socket.gethostbyname(ns_name)
+            # getaddrinfo : passe par la garde anti-SSRF (un NS pointant vers une IP
+            # interne ne doit pas nous faire ouvrir une connexion sur le réseau interne)
+            ns_ip = socket.getaddrinfo(ns_name, 53, socket.AF_INET, socket.SOCK_STREAM)[0][4][0]
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(5)
             sock.connect((ns_ip, 53))

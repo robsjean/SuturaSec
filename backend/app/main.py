@@ -15,6 +15,11 @@ from app.models.user import User
 
 Base.metadata.create_all(bind=engine)
 
+# Anti-SSRF : les scanners ne peuvent se connecter qu'à des adresses publiques
+# (désactivé si ALLOW_PRIVATE_TARGETS=true, pour le développement local)
+from app.core.egress import install_egress_guard
+install_egress_guard()
+
 app = FastAPI(
     title="SuturaSec API",
     description="Security as a Service — Analyse Web & Réseau",

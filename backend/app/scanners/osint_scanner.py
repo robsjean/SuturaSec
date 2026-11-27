@@ -69,23 +69,6 @@ TECH_SIGNATURES: Dict[str, List[str]] = {
 
 EMAIL_REGEX = re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b')
 
-OPEN_PORT_RISKS: Dict[int, Tuple[str, str, float]] = {
-    21:    ("FTP",          "critical", 9.5),
-    22:    ("SSH",          "medium",   5.0),
-    23:    ("Telnet",       "critical", 9.8),
-    25:    ("SMTP",         "medium",   5.5),
-    3306:  ("MySQL",        "critical", 9.5),
-    5432:  ("PostgreSQL",   "critical", 9.5),
-    6379:  ("Redis",        "critical", 9.5),
-    9200:  ("Elasticsearch","critical", 9.8),
-    27017: ("MongoDB",      "critical", 9.5),
-    5984:  ("CouchDB",      "high",     7.5),
-    11211: ("Memcached",    "critical", 9.5),
-    2375:  ("Docker API",   "critical", 10.0),
-    2379:  ("etcd",         "critical", 9.5),
-    9092:  ("Kafka",        "high",     7.5),
-}
-
 
 # ---------------------------------------------------------------------------
 # Scanner class
@@ -149,7 +132,8 @@ class OSINTScanner:
             "Wayback":      self._gather_wayback,
             "Breaches":     self._gather_breaches,
             "GitHub":       self._gather_github,
-            "Ports":        self._gather_ports,
+            # Pas de scan de ports ici : c'est une action intrusive, réservée au module
+            # Réseau. L'OSINT se limite aux sources publiques et à une visite normale du site.
         }
         with ThreadPoolExecutor(max_workers=8) as pool:
             futs = {pool.submit(fn): name for name, fn in tasks.items()}
@@ -802,63 +786,6 @@ class OSINTScanner:
                     "Rotate all credentials found in public repositories."
                 ),
             ))
-
-    # ------------------------------------------------------------------
-    # Open ports
-    # ------------------------------------------------------------------
-
-    def _gather_ports(self):
-        ip = self.ip_addresses[0] if self.ip_addresses else None
-        if not ip:
-            return
-
-        # Try HackerTarget nmap (free tier)
-        try:
-            r = self.client.get(f"https://api.hackertarget.com/nmap/?q={ip}",
-                                 timeout=httpx.Timeout(30.0))
-            if r.status_code == 200 and "open" in r.text.lower():
-                for line in r.text.splitlines():
-                    m = re.search(r'(\d+)/tcp\s+open', line)
-                    if m:
-                        port = int(m.group(1))
-                        self.open_ports.append(port)
-        except Exception:
-            pass
-
-        # Quick TCP connect probe for highest-risk ports
-        risky = [3306, 5432, 6379, 9200, 27017, 5984, 11211, 2375, 2379]
-        for port in risky:
-            if port in self.open_ports:
-                continue
-            try:
-                with socket.create_connection((ip, port), timeout=2):
-                    self.open_ports.append(port)
-            except Exception:
-                pass
-
-        self.open_ports = sorted(set(self.open_ports))
-
-        # Findings for risky open ports
-        for port in self.open_ports:
-            if port in OPEN_PORT_RISKS:
-                service, sev, score = OPEN_PORT_RISKS[port]
-                self._add(Finding(
-                    title=f"Exposed {service} port ({port}) publicly accessible",
-                    description=(
-                        f"Port {port} ({service}) is open and reachable from the internet on `{ip}`. "
-                        f"Publicly exposed {service} instances are a prime target for data theft, "
-                        "ransomware, and cryptomining attacks."
-                    ),
-                    severity=sev,
-                    cvss_score=score,
-                    category="OSINT - Open Port Exposure",
-                    evidence=f"{ip}:{port} ({service}) — TCP connection accepted",
-                    remediation=(
-                        f"Restrict {service} access to internal networks or VPN. "
-                        "Use firewall rules (iptables/security groups) to block public access. "
-                        "Enable authentication and encryption if external access is required."
-                    ),
-                ))
 
     # ------------------------------------------------------------------
     # Recommended Google dorks

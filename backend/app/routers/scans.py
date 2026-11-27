@@ -72,6 +72,13 @@ def _run_scan(
         scan.status = "running"
         db.commit()
 
+        # Re-validation au démarrage : le DNS a pu changer depuis la création (anti-SSRF)
+        from app.services.target_validation import normalize_target, InvalidTarget
+        try:
+            normalize_target(scan.scan_type, scan.target)
+        except InvalidTarget as e:
+            raise _ScanAborted(f"Cible refusée au démarrage de l'analyse : {e}")
+
         if scan.scan_type == "web":
             scanner = WebScanner(scan.target)
             findings = scanner.run()

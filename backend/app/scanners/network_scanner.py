@@ -176,10 +176,12 @@ class NetworkScanner:
             return [f"{prefix}{i}" for i in range(start, min(end + 1, start + 254))]
 
         # Hostname / IP
+        # getaddrinfo (et non gethostbyname) : passe par la garde anti-SSRF, qui refuse
+        # un nom résolu vers une adresse interne (y compris par DNS rebinding).
         try:
-            ip = socket.gethostbyname(target)
+            ip = socket.getaddrinfo(target, None, socket.AF_INET, socket.SOCK_STREAM)[0][4][0]
             return [ip]
-        except socket.gaierror:
+        except OSError:   # gaierror, ou BlockedDestination (adresse non publique)
             return []
 
     # ------------------------------------------------------------------

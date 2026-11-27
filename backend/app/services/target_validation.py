@@ -55,18 +55,50 @@ def _extract_host(raw: str) -> str:
     return host
 
 
-def _resolves(host: str) -> bool:
+_PRIVATE_MSG = (
+    "SuturaSec n'analyse que des cibles publiques sur Internet : les adresses privées, "
+    "locales ou réservées (127.0.0.1, 10.x, 192.168.x, 169.254.x…) sont refusées."
+)
+
+
+def _check_host(host: str, check_dns: bool) -> None:
+    """Vérifie que host existe (DNS) et ne pointe que vers des adresses publiques."""
+    from app.core.egress import blocked_addresses, is_blocked_ip, private_targets_allowed
+
+    allow_private = private_targets_allowed()
     if _is_ip(host):
-        return True
+        if not allow_private and is_blocked_ip(host):
+            raise InvalidTarget(f"L'adresse {host} n'est pas publique. {_PRIVATE_MSG}")
+        return
+    if host == "localhost" and not allow_private:
+        raise InvalidTarget(f"« localhost » désigne le serveur SuturaSec lui-même. {_PRIVATE_MSG}")
+    if not check_dns:
+        return
     previous = socket.getdefaulttimeout()
     socket.setdefaulttimeout(5)
     try:
-        socket.getaddrinfo(host, None)
-        return True
-    except (socket.gaierror, socket.timeout, UnicodeError):
-        return False
+        blocked = blocked_addresses(host)
+    except (socket.gaierror, socket.timeout, UnicodeError, OSError):
+        raise InvalidTarget(
+            f"Le domaine « {host} » est introuvable (aucune résolution DNS). "
+            "Vérifiez l'orthographe de la cible."
+        )
     finally:
         socket.setdefaulttimeout(previous)
+    if blocked and not allow_private:
+        raise InvalidTarget(
+            f"Le domaine « {host} » pointe vers une adresse non publique ({', '.join(blocked)}). "
+            f"{_PRIVATE_MSG}"
+        )
+
+
+def _check_range(addresses, label: str) -> None:
+    from app.core.egress import is_blocked_ip, private_targets_allowed
+    if private_targets_allowed():
+        return
+    blocked = [str(a) for a in addresses if is_blocked_ip(str(a))]
+    if blocked:
+        raise InvalidTarget(f"La plage {label} contient des adresses non publiques ({blocked[0]}…). {_PRIVATE_MSG}")
 
 
 def normalize_target(scan_type: str, raw: str, check_dns: bool = True) -> str:
@@ -106,6 +138,8 @@ def normalize_target(scan_type: str, raw: str, check_dns: bool = True) -> str:
                 raise InvalidTarget(f"« {value} » n'est pas une plage d'IP valide. Exemple : 192.168.1.1-20")
             if start > end:
                 raise InvalidTarget(f"« {value} » : le début de la plage doit être inférieur à la fin.")
+            _check_range(
+                (ipaddress.ip_address(f"{m.group(1)}{i}") for i in range(start, end + 1)), value)
         else:
             try:
                 net = ipaddress.ip_network(value, strict=False)
@@ -116,6 +150,7 @@ def normalize_target(scan_type: str, raw: str, check_dns: bool = True) -> str:
                     f"La plage {value} est trop large ({net.num_addresses} adresses). "
                     "Maximum : /24 (256 adresses)."
                 )
+            _check_range(net, value)
         return value
     else:
         host = _extract_host(value)
@@ -132,13 +167,9 @@ def normalize_target(scan_type: str, raw: str, check_dns: bool = True) -> str:
             if not host or not (_is_hostname(host) or _is_ip(host)):
                 raise InvalidTarget(
                     f"« {raw.strip()} » n'est ni un domaine ni une adresse IP valide. "
-                    "Exemple : example.com ou 203.0.113.10"
+                    "Exemple : example.com ou une adresse IP publique"
                 )
         normalized = host
 
-    if check_dns and not _resolves(host):
-        raise InvalidTarget(
-            f"Le domaine « {host} » est introuvable (aucune résolution DNS). "
-            "Vérifiez l'orthographe de la cible."
-        )
+    _check_host(host, check_dns)
     return normalized

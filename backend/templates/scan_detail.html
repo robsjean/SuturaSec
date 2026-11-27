@@ -1537,7 +1537,8 @@ function scanDetailApp(scanId) {
         network: ['Résolution de la cible', 'Scan des ports les plus courants', 'Identification des services exposés',
                   'Services à risque (bases de données, Docker, Redis…)'],
         subdomain: ['Énumération des sous-domaines', 'Résolution DNS', 'Détection des risques de prise de contrôle'],
-        osint: ['Enregistrements DNS publics', 'Informations exposées dans les sources publiques'],
+        osint: ['WHOIS et enregistrements DNS', 'Hébergeur et géolocalisation (ASN)', 'Certificat TLS et technologies du site', 'Emails publiés sur les pages publiques',
+                'Archives Web (Wayback Machine)', 'Fuites de données connues', 'Exposition sur GitHub'],
         cti: ['Réputation du domaine ou de l\'IP', 'Présence dans les listes de menaces connues'],
       };
       return [...(steps[this.scan?.scan_type] || []), 'Synthèse IA et score de risque'];
