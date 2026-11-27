@@ -11,6 +11,10 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': 'http://localhost:8000',
+      // Feuille de style partagée avec les templates FastAPI (backend/static/css/app.css)
+      '/static': 'http://localhost:8000',
+      // Page du rapport imprimable, servie par FastAPI (lien ouvert via /api/scans/{id}/report-link)
+      '^/scans/\\d+/report': 'http://localhost:8000',
     },
   },
 })

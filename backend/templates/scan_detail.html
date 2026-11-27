@@ -1,1508 +1,580 @@
 {% extends "base_app.html" %}
-{% block title %}Analyse - SuturaSec{% endblock %}
-{% block page_title %}Détail de l'analyse{% endblock %}
-{% block page_subtitle %}Résultats complets et recommandations IA{% endblock %}
-
-{% block header_actions %}
-<a href="/dashboard"
-   class="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400
-          hover:text-gray-900 dark:hover:text-white
-          px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700
-          hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-    <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
-  </svg>
-  Retour
-</a>
-{% endblock %}
+{% block title %}Analyse · SuturaSec{% endblock %}
 
 {% block content %}
-<div x-data="scanDetailApp({{ scan_id }})" x-init="init()">
+<div class="stack" style="gap:24px" x-data="scanDetailApp({{ scan_id }})" x-init="init()">
 
-  <!-- Loading -->
-  <div x-show="loading" class="flex flex-col items-center justify-center py-24 text-gray-400">
-    <svg class="animate-spin mb-3" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/>
-      <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/>
-      <line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>
-      <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/>
-    </svg>
-    Chargement de l'analyse...
+  <nav class="crumbs" aria-label="Fil d'Ariane">
+    <a href="/dashboard">Analyses</a><span aria-hidden="true">/</span>
+    <span style="color:var(--text)" x-text="scan?.target || '…'"></span>
+  </nav>
+
+  <div class="loading" x-show="loading"><span class="spinner" aria-hidden="true"></span>Chargement de l'analyse…</div>
+
+  <div class="card empty" x-show="!loading && !scan" x-cloak>
+    <h2>Analyse introuvable</h2>
+    <p>Elle a peut-être été supprimée.</p>
+    <a class="btn" href="/dashboard" style="margin-top:8px">Retour au tableau de bord</a>
   </div>
 
-  <!-- Not found -->
-  <div x-show="!loading && !scan" x-cloak class="text-center py-24 text-gray-500">Analyse introuvable.</div>
-
   <template x-if="scan">
-    <div class="space-y-5 fade-up">
+    <div class="stack" style="gap:24px">
 
-      <!-- ===== SCAN HEADER ===== -->
-      <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
-        <div class="flex items-start justify-between gap-4 flex-wrap">
-          <div class="flex items-center gap-4">
-            <!-- Type icon -->
-            <div class="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
-                 :class="{
-                   'bg-blue-50 dark:bg-blue-900/20 text-blue-500 dark:text-blue-400': scan.scan_type === 'web',
-                   'bg-purple-50 dark:bg-purple-900/20 text-purple-500 dark:text-purple-400': scan.scan_type === 'network',
-                   'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500 dark:text-emerald-400': scan.scan_type === 'cti',
-                   'bg-violet-50 dark:bg-violet-900/20 text-violet-500 dark:text-violet-400': scan.scan_type === 'subdomain',
-                   'bg-orange-50 dark:bg-orange-900/20 text-orange-500 dark:text-orange-400': scan.scan_type === 'api',
-                   'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-500 dark:text-cyan-400': scan.scan_type === 'osint',
-                 }">
-              <template x-if="scan.scan_type === 'web'">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
-                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-                </svg>
-              </template>
-              <template x-if="scan.scan_type === 'network'">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/>
-                  <line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
-                </svg>
-              </template>
-              <template x-if="scan.scan_type === 'cti'">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
-                </svg>
-              </template>
-              <template x-if="scan.scan_type === 'subdomain'">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="3"/><circle cx="4" cy="6" r="2"/><circle cx="20" cy="6" r="2"/>
-                  <circle cx="4" cy="18" r="2"/><circle cx="20" cy="18" r="2"/>
-                  <line x1="6" y1="6" x2="10" y2="11"/><line x1="18" y1="6" x2="14" y2="11"/>
-                  <line x1="6" y1="18" x2="10" y2="13"/><line x1="18" y1="18" x2="14" y2="13"/>
-                </svg>
-              </template>
-              <template x-if="scan.scan_type === 'api'">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
-                </svg>
-              </template>
-              <template x-if="scan.scan_type === 'osint'">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                  <line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
-                </svg>
-              </template>
-              <template x-if="scan.scan_type === 'authenticated_web'">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                </svg>
-              </template>
-            </div>
-            <div>
-              <h2 class="text-lg font-bold text-gray-900 dark:text-white break-all" x-text="scan.target"></h2>
-              <p class="text-sm text-gray-500 mt-0.5">
-                <span x-text="{'web':'Analyse Web','network':'Analyse Réseau','cti':'Threat Intelligence','subdomain':'Subdomain Enumeration','api':'API Security Scanner','osint':'OSINT Recon','authenticated_web':'Analyse Web authentifiée'}[scan.scan_type] || scan.scan_type"></span>
-                · <span x-text="new Date(scan.created_at).toLocaleDateString('fr-FR', { day:'2-digit', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' })"></span>
-              </p>
-            </div>
-          </div>
-
-          <!-- PDF + Status -->
-          <div class="flex items-center gap-3 flex-wrap">
-            <!-- Status -->
-            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold"
-                  :class="{
-                    'bg-gray-100 dark:bg-gray-800 text-gray-500': scan.status === 'pending',
-                    'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400': scan.status === 'running',
-                    'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400': scan.status === 'completed',
-                    'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400': scan.status === 'failed'
-                  }">
-              <span x-show="scan.status === 'running'" class="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
-              <span x-text="{pending:'En attente', running:'En cours...', completed:'Terminé', failed:'Échoué'}[scan.status]"></span>
-            </span>
-
-            <!-- PDF Button -->
-            <button x-show="scan.status === 'completed'" x-cloak @click="openReport()"
-                    class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold
-                           bg-gray-900 dark:bg-white text-white dark:text-gray-900
-                           hover:bg-gray-700 dark:hover:bg-gray-100
-                           shadow-sm transition-all">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-              </svg>
-              Rapport PDF
-            </button>
+      <!-- En-tête -->
+      <header class="page-head" style="align-items:flex-start">
+        <div style="min-width:0">
+          <h1 class="mono" style="font-family:var(--mono);font-size:22px;overflow-wrap:anywhere" x-text="scan.target"></h1>
+          <div class="meta">
+            <span class="type"><span x-html="icon(scan.scan_type)"></span><span x-text="'Analyse ' + typeLabel(scan.scan_type)"></span></span>
+            <span class="status"><span class="dot" :class="statusDot(scan.status)"></span><span x-text="statusLabel(scan.status)"></span></span>
+            <span x-text="fmtDate(scan.created_at)"></span>
+            <span x-show="duration" x-text="'Durée ' + duration"></span>
           </div>
         </div>
-      </div>
-
-      <!-- ===== STATS ROW ===== -->
-      <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <!-- Risk score -->
-        <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 shadow-sm md:col-span-1 col-span-2">
-          <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Score de risque</p>
-          <div class="flex items-end gap-1">
-            <p class="text-4xl font-bold"
-               :class="{
-                 'text-red-500 dark:text-red-400': scan.risk_score >= 7,
-                 'text-amber-500 dark:text-amber-400': scan.risk_score >= 4 && scan.risk_score < 7,
-                 'text-green-500 dark:text-green-400': scan.risk_score != null && scan.risk_score < 4,
-                 'text-gray-400': scan.risk_score == null
-               }"
-               x-text="scan.risk_score != null ? scan.risk_score.toFixed(1) : '—'"></p>
-            <p class="text-gray-400 text-sm mb-1">/10</p>
-          </div>
+        <div class="actions">
+          <button class="btn btn-ink" type="button" x-show="scan.status === 'completed'" @click="openReport()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg>
+            Rapport PDF
+          </button>
         </div>
+      </header>
 
-        <!-- Severity counts (web / network / cti / api / osint) -->
-        <template x-if="scan.scan_type !== 'subdomain'">
-          <template x-for="sev in ['critical','high','medium','low']" :key="sev">
-            <div class="rounded-2xl p-4 border shadow-sm" :class="severityCard(sev)">
-              <p class="text-xs font-semibold mb-2 uppercase tracking-wider" :class="severityText(sev)" x-text="severityLabel(sev)"></p>
-              <p class="text-2xl font-bold text-gray-900 dark:text-white" x-text="countBySeverity(sev)"></p>
-            </div>
-          </template>
-        </template>
-
-        <!-- Subdomain stats -->
-        <template x-if="scan.scan_type === 'subdomain'">
-          <div class="contents">
-            <div class="rounded-2xl p-4 border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-900/20 shadow-sm">
-              <p class="text-xs font-semibold mb-2 uppercase tracking-wider text-violet-500">Trouvés</p>
-              <p class="text-2xl font-bold text-gray-900 dark:text-white"
-                 x-text="scan.subdomain_results?.total_found ?? '—'"></p>
-            </div>
-            <div class="rounded-2xl p-4 border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 shadow-sm">
-              <p class="text-xs font-semibold mb-2 uppercase tracking-wider text-green-500">Actifs HTTP</p>
-              <p class="text-2xl font-bold text-gray-900 dark:text-white"
-                 x-text="scan.subdomain_results?.summary?.active_http ?? '—'"></p>
-            </div>
-            <div class="rounded-2xl p-4 border shadow-sm"
-                 :class="scan.subdomain_results?.summary?.takeover_risks > 0
-                   ? 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20'
-                   : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900'">
-              <p class="text-xs font-semibold mb-2 uppercase tracking-wider"
-                 :class="scan.subdomain_results?.summary?.takeover_risks > 0 ? 'text-red-500' : 'text-gray-500'">Takeover</p>
-              <p class="text-2xl font-bold text-gray-900 dark:text-white"
-                 x-text="scan.subdomain_results?.summary?.takeover_risks ?? 0"></p>
-            </div>
-            <div class="rounded-2xl p-4 border shadow-sm"
-                 :class="scan.subdomain_results?.summary?.dev_exposed > 0
-                   ? 'border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20'
-                   : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900'">
-              <p class="text-xs font-semibold mb-2 uppercase tracking-wider"
-                 :class="scan.subdomain_results?.summary?.dev_exposed > 0 ? 'text-amber-500' : 'text-gray-500'">Dev Exposés</p>
-              <p class="text-2xl font-bold text-gray-900 dark:text-white"
-                 x-text="scan.subdomain_results?.summary?.dev_exposed ?? 0"></p>
-            </div>
-          </div>
-        </template>
-      </div>
-
-      <!-- Running banner -->
-      <div x-show="scan.status === 'running' || scan.status === 'pending'" x-cloak
-           class="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800
-                  text-indigo-700 dark:text-indigo-300 rounded-2xl px-5 py-4 text-sm">
-        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 font-medium">
-          <svg class="animate-spin flex-shrink-0" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/>
-            <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/>
-            <line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>
-            <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/>
-          </svg>
-          <span x-text="scan.status === 'running' ? 'Analyse en cours' : 'Analyse en attente de démarrage'"></span>
-          <span class="tabular-nums text-indigo-500 dark:text-indigo-400 font-normal"
-                x-text="'· ' + elapsedLabel"></span>
+      <!-- En cours -->
+      <section class="card card-pad stack" style="gap:16px" x-show="scan.status === 'running' || scan.status === 'pending'" aria-live="polite">
+        <div class="row between">
+          <div class="row"><span class="spinner" aria-hidden="true"></span>
+            <h2 x-text="scan.status === 'running' ? 'Analyse en cours' : 'Analyse en attente de démarrage'"></h2></div>
+          <span class="small muted num" x-text="elapsedLabel"></span>
         </div>
-        <p class="mt-1 text-xs text-indigo-600/80 dark:text-indigo-300/70">
-          Selon la cible, l'analyse prend de quelques secondes à une dizaine de minutes.
-          Vous pouvez quitter cette page : les résultats seront enregistrés et s'afficheront ici.
-        </p>
-        <div class="mt-3 pt-3 border-t border-indigo-200/70 dark:border-indigo-800/70">
-          <p class="text-[11px] font-semibold uppercase tracking-wider text-indigo-500 dark:text-indigo-400 mb-2">
-            Ce que vérifie cette analyse
-          </p>
-          <ul class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-xs text-indigo-800 dark:text-indigo-200">
+        <p class="small muted">Selon la cible, l'analyse prend de quelques secondes à une dizaine de minutes. Vous pouvez quitter cette page : les résultats seront enregistrés et s'afficheront ici.</p>
+        <div class="stack-sm" style="padding-top:12px;border-top:1px solid var(--border)">
+          <p class="label">Ce que vérifie cette analyse</p>
+          <ul class="checks" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:6px 24px;font-size:13px;color:var(--text-2)">
             <template x-for="step in scanSteps" :key="step">
-              <li class="flex items-start gap-2"><span class="mt-1.5 w-1 h-1 rounded-full bg-indigo-400 flex-shrink-0"></span><span x-text="step"></span></li>
+              <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="6"/></svg><span x-text="step"></span></li>
             </template>
           </ul>
         </div>
-      </div>
+      </section>
 
-      <div x-show="scan.status === 'failed'" x-cloak
-           class="flex items-center gap-3 bg-red-50 dark:bg-red-900/20
-                  border border-red-200 dark:border-red-800
-                  text-red-700 dark:text-red-400
-                  rounded-2xl px-5 py-3 text-sm font-medium">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
-        </svg>
-        <div>
-          <p>L'analyse a échoué. Vérifiez la cible et relancez un scan.</p>
-          <p x-show="scan.summary" x-text="scan.summary" class="mt-1 text-xs font-normal opacity-80"></p>
+      <!-- Échec -->
+      <section class="card card-pad stack" x-show="scan.status === 'failed'">
+        <div class="note fail" role="alert">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 3l10 18H2L12 3z"/><path d="M12 10v4M12 17.5v.5"/></svg>
+          <div><b style="font-weight:600">L'analyse n'a pas pu aboutir.</b><br>
+            <span x-text="scan.summary || 'Vérifiez que la cible est correcte et accessible, puis relancez une analyse.'"></span></div>
         </div>
-      </div>
+        <div class="actions"><a class="btn btn-primary" :href="'/dashboard?scan=' + scan.scan_type">Relancer une analyse</a></div>
+      </section>
 
-      <!-- ===== TABS ===== -->
-      <div x-show="scan.status === 'completed'" x-cloak>
+      <template x-if="scan.status === 'completed'">
+        <div class="stack" style="gap:24px">
 
-        <!-- Tab navigation -->
-        <div class="flex gap-1 bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-1">
-          <template x-for="t in tabs" :key="t.key">
-            <button @click="activeTab = t.key"
-                    class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all"
-                    :class="activeTab === t.key
-                      ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
-                      : 'text-gray-500 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'">
-              <span x-text="t.label"></span>
-              <span x-show="t.count !== null && t.count !== undefined"
-                    class="text-xs px-1.5 py-0.5 rounded-full font-bold"
-                    :class="activeTab === t.key
-                      ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400'
-                      : 'bg-gray-200 dark:bg-gray-800 text-gray-500 dark:text-gray-600'"
-                    x-text="t.count"></span>
-            </button>
-          </template>
-        </div>
-
-        <!-- ===== TAB: APERÇU ===== -->
-        <div x-show="activeTab === 'overview'" class="space-y-4 mt-4">
-
-          <!-- Executive Summary -->
-          <div x-show="scan.summary"
-               class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
-            <div class="flex items-center gap-2 mb-3">
-              <div class="w-7 h-7 rounded-lg bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                </svg>
+          <!-- Synthèse -->
+          <section class="grid-2" aria-label="Synthèse" x-show="scan.scan_type !== 'subdomain'">
+            <div class="card card-pad stack" style="gap:12px">
+              <p class="small muted">Score de risque</p>
+              <div class="score">
+                <strong :class="riskCls(scan.risk_score)" x-text="scan.risk_score != null ? scan.risk_score.toFixed(1) : '—'"></strong>
+                <span x-text="'/ 10' + (scan.risk_score != null ? ' · ' + riskLabel(scan.risk_score) : '')"></span>
               </div>
-              <p class="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Résumé Exécutif — IA</p>
+              <div class="bar" :class="riskBar(scan.risk_score)"><span :style="`width:${(scan.risk_score || 0) * 10}%`"></span></div>
             </div>
-            <p class="text-gray-700 dark:text-gray-300 text-sm leading-relaxed" x-text="scan.summary"></p>
-          </div>
-
-          <!-- Risk Narrative -->
-          <div x-show="scan.attack_paths?.risk_narrative" x-cloak
-               class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
-            <div class="flex items-center gap-2 mb-3">
-              <div class="w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2">
-                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                </svg>
+            <div class="card card-pad stack" style="gap:14px">
+              <div class="row between"><p class="small muted">Vulnérabilités par sévérité</p><b class="num" x-text="scan.vulnerabilities.length"></b></div>
+              <div class="stacked" aria-hidden="true" x-show="scan.vulnerabilities.length">
+                <template x-for="s in SEVS" :key="s">
+                  <span :style="`width:${count(s) / scan.vulnerabilities.length * 100}%;background:var(--${s === 'info' ? 'border-strong' : s})`"></span>
+                </template>
               </div>
-              <p class="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Analyse de Risque</p>
+              <dl class="legend">
+                <template x-for="s in SEVS" :key="s">
+                  <div><dt x-text="sevLabel(s)"></dt><dd x-text="count(s)"></dd></div>
+                </template>
+              </dl>
             </div>
-            <p class="text-gray-700 dark:text-gray-300 text-sm leading-relaxed" x-text="scan.attack_paths?.risk_narrative"></p>
+          </section>
+
+          <section class="stats" x-show="scan.scan_type === 'subdomain'" aria-label="Synthèse">
+            <div class="stat"><p>Sous-domaines</p><strong x-text="sub?.total_found ?? '—'"></strong><small>découverts</small></div>
+            <div class="stat"><p>Actifs HTTP</p><strong x-text="sub?.summary?.active_http ?? '—'"></strong><small>répondent</small></div>
+            <div class="stat"><p>Takeover</p><strong :class="sub?.summary?.takeover_risks > 0 ? 'c-critical' : ''" x-text="sub?.summary?.takeover_risks ?? 0"></strong><small>à corriger</small></div>
+            <div class="stat"><p>Dev exposés</p><strong :class="sub?.summary?.dev_exposed > 0 ? 'c-medium' : ''" x-text="sub?.summary?.dev_exposed ?? 0"></strong><small>environnements</small></div>
+          </section>
+
+          <!-- Onglets -->
+          <nav class="tabs" role="tablist" aria-label="Sections de l'analyse">
+            <template x-for="t in tabs" :key="t.key">
+              <a href="#" role="tab" :aria-selected="activeTab === t.key" :aria-current="activeTab === t.key ? 'page' : null"
+                 @click.prevent="setTab(t.key)">
+                <span x-text="t.label"></span>
+                <span class="count" x-show="t.count !== null && t.count !== undefined" x-text="t.count"></span>
+              </a>
+            </template>
+          </nav>
+
+          <!-- ===== Aperçu ===== -->
+          <div class="stack" x-show="activeTab === 'overview'">
+            <section class="card card-pad stack-sm" x-show="scan.summary">
+              <div class="row between"><h2>Résumé exécutif</h2><span class="tag">Généré par l'IA</span></div>
+              <p class="t2" style="max-width:75ch" x-text="scan.summary"></p>
+            </section>
+            <section class="card card-pad stack-sm" x-show="ai.risk_narrative">
+              <h2>Analyse de risque</h2>
+              <p class="t2" style="max-width:75ch" x-text="ai.risk_narrative"></p>
+            </section>
+            <section class="card" x-show="ai.quick_wins?.length">
+              <div class="card-head"><h2>Actions rapides</h2><p>Corrections à fort impact et faible effort</p></div>
+              <ul class="list">
+                <template x-for="(w, i) in ai.quick_wins || []" :key="i">
+                  <li>
+                    <svg class="check" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>
+                    <span x-text="w"></span>
+                  </li>
+                </template>
+              </ul>
+            </section>
+            <section class="card empty" x-show="!scan.summary && !ai.risk_narrative && !ai.quick_wins?.length">
+              <p>Aucune synthèse IA pour cette analyse.</p>
+            </section>
           </div>
 
-          <!-- Quick Wins -->
-          <div x-show="scan.attack_paths?.quick_wins?.length" x-cloak
-               class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
-            <div class="flex items-center gap-2 mb-4">
-              <div class="w-7 h-7 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5">
-                  <polyline points="20 6 9 17 4 12"/>
-                </svg>
+          <!-- ===== Vulnérabilités ===== -->
+          <div class="stack" x-show="activeTab === 'vulns'">
+            <div class="row between" x-show="scan.vulnerabilities.length">
+              <div class="segmented" role="group" aria-label="Filtrer par sévérité">
+                <button type="button" :aria-pressed="sevFilter === '' ? 'true' : 'false'" @click="sevFilter = ''" x-text="'Toutes · ' + scan.vulnerabilities.length"></button>
+                <template x-for="s in SEVS" :key="s">
+                  <button type="button" x-show="count(s)" :aria-pressed="sevFilter === s ? 'true' : 'false'" @click="sevFilter = s" x-text="sevLabel(s) + ' · ' + count(s)"></button>
+                </template>
               </div>
-              <p class="text-xs font-bold text-green-600 dark:text-green-400 uppercase tracking-wider">Actions Rapides (Quick Wins)</p>
-            </div>
-            <ul class="space-y-2.5">
-              <template x-for="(win, i) in scan.attack_paths?.quick_wins || []" :key="i">
-                <li class="flex items-start gap-3 text-sm">
-                  <span class="w-5 h-5 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5 text-xs font-bold" x-text="i + 1"></span>
-                  <span class="text-gray-700 dark:text-gray-300" x-text="win"></span>
-                </li>
-              </template>
-            </ul>
-          </div>
-        </div>
-
-        <!-- ===== TAB: VULNÉRABILITÉS ===== -->
-        <div x-show="activeTab === 'vulns'" class="mt-4">
-          <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm overflow-hidden">
-
-            <div x-show="scan.vulnerabilities.length === 0"
-                 class="flex flex-col items-center justify-center py-16 text-gray-400">
-              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mb-3">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
-              <p class="font-medium text-gray-600 dark:text-gray-400">Aucune vulnérabilité détectée</p>
-              <p class="text-sm mt-1">Votre cible semble sécurisée 🎉</p>
+              <label class="search">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+                <input type="search" x-model="vulnQuery" placeholder="Rechercher" aria-label="Rechercher une vulnérabilité">
+              </label>
             </div>
 
-            <div x-show="scan.vulnerabilities.length > 0" class="divide-y divide-gray-100 dark:divide-gray-800">
-              <template x-for="vuln in scan.vulnerabilities" :key="vuln.id">
-                <div class="p-5">
-                  <div class="flex items-start justify-between gap-4 mb-2 flex-wrap">
-                    <h3 class="font-semibold text-gray-900 dark:text-white text-sm" x-text="vuln.title"></h3>
-                    <div class="flex items-center gap-2 flex-shrink-0">
-                      <span x-show="vuln.cvss_score != null"
-                            class="text-xs text-gray-500 font-mono font-medium"
-                            x-text="'CVSS ' + vuln.cvss_score?.toFixed(1)"></span>
-                      <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold border"
-                            :class="severityBadge(vuln.severity)"
-                            x-text="severityLabel(vuln.severity)"></span>
-                    </div>
-                  </div>
-                  <p x-show="vuln.category"
-                     class="text-xs text-indigo-600 dark:text-indigo-400 font-medium mb-2"
-                     x-text="vuln.category"></p>
-                  <p x-show="vuln.description"
-                     class="text-gray-600 dark:text-gray-400 text-sm mb-3 leading-relaxed"
-                     x-text="vuln.description"></p>
-                  <div x-show="vuln.evidence"
-                       class="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-xs font-mono text-gray-700 dark:text-gray-300 mb-3 overflow-x-auto"
-                       x-text="vuln.evidence"></div>
-                  <div x-show="vuln.remediation"
-                       class="flex items-start gap-2.5 text-sm text-green-700 dark:text-green-400
-                              bg-green-50 dark:bg-green-900/10
-                              border border-green-200 dark:border-green-900/50
-                              rounded-xl px-4 py-3 mb-3">
-                    <svg class="mt-0.5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                    </svg>
-                    <span x-text="vuln.remediation"></span>
-                  </div>
+            <section class="card empty" x-show="!scan.vulnerabilities.length">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>
+              <h2>Aucune vulnérabilité détectée</h2>
+              <p>Aucun constat n'a été remonté par cette analyse.</p>
+            </section>
 
-                  <!-- ATT&CK Techniques -->
-                  <div x-show="vuln.attack_techniques?.length" class="flex flex-wrap gap-2">
-                    <template x-for="(tech, ti) in vuln.attack_techniques || []" :key="ti">
-                      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold
-                                   bg-orange-50 dark:bg-orange-900/20
-                                   text-orange-700 dark:text-orange-400
-                                   border border-orange-200 dark:border-orange-800">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                        </svg>
-                        <span x-text="tech.id"></span>
-                        <span class="text-orange-500 dark:text-orange-500">·</span>
-                        <span x-text="tech.tactic" class="font-normal text-orange-600/80 dark:text-orange-400/80"></span>
-                      </span>
-                    </template>
-                  </div>
-                </div>
-              </template>
-            </div>
-          </div>
-        </div>
-
-        <!-- ===== TAB: CHEMINS D'ATTAQUE ===== -->
-        <div x-show="activeTab === 'attacks'" class="mt-4">
-          <div x-show="!scan.attack_paths?.attack_paths?.length" x-cloak
-               class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-12 text-center text-gray-500 shadow-sm">
-            Aucun chemin d'attaque modélisé.
-          </div>
-
-          <div x-show="scan.attack_paths?.attack_paths?.length" x-cloak
-               class="space-y-4">
-            <template x-for="(ap, idx) in scan.attack_paths?.attack_paths || []" :key="idx">
-              <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
-                <!-- Header -->
-                <div class="flex items-start justify-between gap-4 mb-4 flex-wrap">
-                  <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center text-red-500 dark:text-red-400 flex-shrink-0">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                        <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                      </svg>
-                    </div>
-                    <h3 class="font-semibold text-gray-900 dark:text-white" x-text="ap.name"></h3>
-                  </div>
-                  <div class="flex items-center gap-3 flex-shrink-0">
-                    <span class="px-2.5 py-1 rounded-lg text-xs font-bold border"
-                          :class="{
-                            'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800': ap.severity === 'critical',
-                            'bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800': ap.severity === 'high',
-                            'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800': ap.severity === 'medium',
-                            'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800': ap.severity === 'low',
-                          }"
-                          x-text="severityLabel(ap.severity)"></span>
-                    <span class="text-xs text-gray-500">
-                      Prob. <span class="font-medium text-gray-700 dark:text-gray-300" x-text="ap.probability"></span>
+            <section class="card" x-show="scan.vulnerabilities.length" aria-label="Liste des vulnérabilités">
+              <template x-for="(v, i) in visibleVulns" :key="v.id">
+                <details class="finding" :open="i === 0 && (v.severity === 'critical' || v.severity === 'high')">
+                  <summary>
+                    <span class="sev" :class="v.severity" x-text="sevLabel(v.severity)"></span>
+                    <div><div class="title" x-text="v.title"></div><div class="sub" x-text="v.category || ''"></div></div>
+                    <span class="row" style="gap:10px">
+                      <span class="tag mono" x-show="v.cvss_score != null" x-text="'CVSS ' + v.cvss_score?.toFixed(1)"></span>
+                      <span class="chev"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span>
                     </span>
+                  </summary>
+                  <div class="finding-body">
+                    <p x-show="v.description" x-text="v.description"></p>
+                    <div x-show="v.evidence"><h4>Preuve technique</h4><div class="evidence" x-text="v.evidence"></div></div>
+                    <div x-show="v.remediation"><h4>Remédiation</h4><p x-text="v.remediation"></p></div>
+                    <div x-show="v.attack_techniques?.length"><h4>Techniques MITRE ATT&amp;CK</h4>
+                      <div class="tags"><template x-for="(t, ti) in v.attack_techniques || []" :key="ti">
+                        <span class="tag mono" x-text="(t.id || t) + (t.tactic ? ' · ' + t.tactic : '')"></span>
+                      </template></div>
+                    </div>
+                  </div>
+                </details>
+              </template>
+              <p class="muted small" style="padding:20px" x-show="visibleVulns.length === 0">Aucune vulnérabilité ne correspond au filtre.</p>
+            </section>
+          </div>
+
+          <!-- ===== Chemins d'attaque ===== -->
+          <div class="stack" x-show="activeTab === 'attacks'">
+            <p class="small muted" x-show="ai.attack_paths?.length">Scénarios d'exploitation identifiés par l'IA à partir des vulnérabilités détectées.</p>
+            <section class="card empty" x-show="!ai.attack_paths?.length"><p>Aucun chemin d'attaque modélisé pour cette analyse.</p></section>
+            <template x-for="(ap, idx) in ai.attack_paths || []" :key="idx">
+              <section class="card">
+                <div class="card-head">
+                  <div class="stack-sm" style="gap:2px">
+                    <h2 x-text="ap.name || ap.title || ('Scénario ' + (idx + 1))"></h2>
+                    <p x-show="ap.probability" x-text="'Probabilité ' + ({ high: 'élevée', medium: 'moyenne', low: 'faible' }[ap.probability] || ap.probability)"></p>
+                  </div>
+                  <span class="sev" :class="ap.severity" x-show="ap.severity" x-text="sevLabel(ap.severity)"></span>
+                </div>
+                <div class="card-body grid-2" style="gap:24px">
+                  <div class="stack">
+                    <p class="label">Étapes</p>
+                    <ol class="path"><template x-for="(st, si) in ap.steps || []" :key="si"><li x-text="st"></li></template></ol>
+                  </div>
+                  <div class="stack">
+                    <div class="stack-sm" x-show="ap.prerequisites"><p class="label">Prérequis</p><p class="small t2" x-text="ap.prerequisites"></p></div>
+                    <div class="stack-sm" x-show="ap.impact"><p class="label">Impact</p><p class="small t2" x-text="ap.impact"></p></div>
+                    <div class="stack-sm" x-show="ap.mitre_techniques?.length"><p class="label">Techniques MITRE ATT&amp;CK</p>
+                      <div class="tags"><template x-for="(t, ti) in ap.mitre_techniques || []" :key="ti"><span class="tag mono" x-text="t"></span></template></div>
+                    </div>
                   </div>
                 </div>
+              </section>
+            </template>
+          </div>
 
-                <!-- Prerequisites -->
-                <div x-show="ap.prerequisites" class="text-xs text-gray-500 mb-4 flex items-start gap-2">
-                  <span class="font-semibold text-gray-600 dark:text-gray-400 flex-shrink-0">Prérequis :</span>
-                  <span x-text="ap.prerequisites"></span>
+          <!-- ===== Remédiation ===== -->
+          <div class="stack" x-show="activeTab === 'remediation'">
+            <section class="card empty" x-show="!ai.top_priorities?.length"><p>Aucune priorité de remédiation définie.</p></section>
+            <section class="card" x-show="ai.top_priorities?.length">
+              <div class="card-head"><h2>Plan de remédiation priorisé</h2><p>Classé par impact sur le risque</p></div>
+              <ol class="list">
+                <template x-for="(p, i) in ai.top_priorities || []" :key="i">
+                  <li>
+                    <span class="step-n" x-text="p.rank || i + 1"></span>
+                    <div class="stack-sm" style="flex:1">
+                      <b style="font-weight:500" x-text="p.action"></b>
+                      <p class="small t2" x-show="p.reason" x-text="p.reason"></p>
+                      <div class="row xs muted" style="gap:16px">
+                        <span x-text="'Effort : ' + (p.effort || '—')"></span>
+                        <span x-text="'Impact attendu : ' + (p.impact_if_fixed || '—')"></span>
+                      </div>
+                    </div>
+                  </li>
+                </template>
+              </ol>
+            </section>
+          </div>
+
+          <!-- ===== Conformité ===== -->
+          <div class="stack" x-show="activeTab === 'compliance'">
+            <template x-if="scan.compliance_reports">
+              <div class="stack">
+                <div>
+                  <h2>Rapport de conformité</h2>
+                  <p class="small muted">
+                    Score global <b class="num" style="color:var(--text)" x-text="scan.compliance_reports.global_score?.toFixed(0) + ' / 100'"></b>
+                    · note <b style="color:var(--text)" x-text="scan.compliance_reports.global_grade"></b>.
+                    <span x-text="scan.compliance_reports.summary || ''"></span>
+                  </p>
+                </div>
+                <div class="grid-3" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+                  <template x-for="(fw, fi) in scan.compliance_reports.frameworks" :key="fw.framework">
+                    <button type="button" class="card card-pad stack-sm fw-card"
+                            :style="fwIndex === fi && 'border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)'"
+                            :aria-pressed="fwIndex === fi ? 'true' : 'false'" @click="fwIndex = fi">
+                      <p class="small" x-text="fw.framework + ' ' + (fw.version || '')"></p>
+                      <div class="score"><strong style="font-size:28px" x-text="fw.overall_score?.toFixed(0)"></strong><span x-text="'/ 100 · ' + fw.grade"></span></div>
+                      <div class="bar" :class="scoreBar(fw.overall_score)"><span :style="`width:${fw.overall_score}%`"></span></div>
+                      <p class="xs muted" x-text="fw.passed + ' conformes · ' + (fw.partial || 0) + ' partiels · ' + fw.failed + ' non conformes'"></p>
+                    </button>
+                  </template>
                 </div>
 
-                <!-- Steps -->
-                <div class="mb-4">
-                  <p class="text-xs font-semibold text-gray-500 dark:text-gray-500 uppercase tracking-wider mb-3">Étapes d'attaque</p>
-                  <ol class="space-y-2">
-                    <template x-for="(step, si) in ap.steps || []" :key="si">
-                      <li class="flex items-start gap-3 text-sm">
-                        <span class="w-6 h-6 rounded-full border-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800
-                                     flex items-center justify-center text-xs font-bold text-gray-500 flex-shrink-0 mt-0.5"
-                              x-text="si + 1"></span>
-                        <span class="text-gray-700 dark:text-gray-300 leading-relaxed" x-text="step"></span>
+                <template x-for="(fw, fi) in scan.compliance_reports.frameworks" :key="'d' + fw.framework">
+                  <section class="card" x-show="fwIndex === fi">
+                    <div class="card-head">
+                      <div class="stack-sm" style="gap:2px"><h2 x-text="'Contrôles · ' + fw.framework + ' ' + (fw.version || '')"></h2><p x-text="fw.compliance_statement || ''"></p></div>
+                      <p x-text="(fw.controls || []).length + ' contrôles'"></p>
+                    </div>
+                    <template x-for="c in fw.controls || []" :key="c.id">
+                      <details class="finding" :open="c.status === 'fail'">
+                        <summary class="ctrl-sum">
+                          <span class="mono muted" x-text="c.id"></span>
+                          <div><div class="title" x-text="c.title"></div><div class="sub" x-text="c.category || ''"></div></div>
+                          <span class="row" style="gap:12px">
+                            <span class="num small muted" x-text="c.score != null ? c.score + ' %' : '—'"></span>
+                            <span class="tag" :class="ctrlCls(c.status)" x-text="ctrlLabel(c.status)"></span>
+                            <span class="chev"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span>
+                          </span>
+                        </summary>
+                        <div class="finding-body" style="padding-left:20px">
+                          <div x-show="c.requirement"><h4>Exigence du standard</h4><p x-text="c.requirement"></p></div>
+                          <div x-show="c.evidence?.length"><h4>Preuves du scan</h4>
+                            <ul class="evidence-list"><template x-for="(ev, ei) in c.evidence || []" :key="ei"><li x-text="ev"></li></template></ul>
+                          </div>
+                          <div x-show="c.impact"><h4>Impact business / légal</h4><p x-text="c.impact"></p></div>
+                          <div x-show="c.status !== 'pass' && c.remediation?.length"><h4>Plan de remédiation</h4>
+                            <ol style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px"><template x-for="(r, ri) in c.remediation || []" :key="ri"><li x-text="r"></li></template></ol>
+                          </div>
+                          <div x-show="c.cwe_references?.length"><h4>Références CWE</h4>
+                            <div class="tags"><template x-for="cwe in c.cwe_references || []" :key="cwe">
+                              <a class="tag mono" target="_blank" rel="noopener" :href="'https://cwe.mitre.org/data/definitions/' + cwe.replace('CWE-', '') + '.html'" x-text="cwe"></a>
+                            </template></div>
+                          </div>
+                        </div>
+                      </details>
+                    </template>
+                  </section>
+                </template>
+              </div>
+            </template>
+          </div>
+
+          <!-- ===== Threat Intel ===== -->
+          <div class="stack" x-show="activeTab === 'threat_intel'">
+            <section class="card empty" x-show="!ti"><p>Données Threat Intelligence non disponibles.</p></section>
+            <template x-if="ti">
+              <div class="stack">
+                <section class="stats">
+                  <div class="stat"><p>Score de menace</p>
+                    <strong :class="tiCls(ti.risk_level)" x-text="ti.threat_score != null ? ti.threat_score.toFixed(1) : '—'"></strong>
+                    <small x-text="sevLabel(ti.risk_level) || '—'"></small></div>
+                  <div class="stat"><p>Adresse IP</p><strong class="mono" style="font-size:16px;margin-top:10px" x-text="ti.ip || '—'"></strong><small x-text="ti.domain || ''"></small></div>
+                  <div class="stat" x-show="ti.abuse?.confidence_score !== undefined"><p>Score d'abus</p><strong x-text="(ti.abuse?.confidence_score ?? 0) + ' %'"></strong><small x-text="(ti.abuse?.total_reports ?? 0) + ' signalements'"></small></div>
+                  <div class="stat"><p>Listes DNSBL</p><strong :class="ti.blacklists?.listed > 0 && 'c-critical'" x-text="(ti.blacklists?.listed ?? 0) + ' / ' + (ti.blacklists?.checked ?? 0)"></strong><small>listes de blocage</small></div>
+                </section>
+
+                <div class="grid-2">
+                  <section class="card" x-show="ti.geolocation?.country">
+                    <div class="card-head"><h2>Géolocalisation et ASN</h2></div>
+                    <dl class="kv-list card-body" style="padding-top:8px;padding-bottom:8px">
+                      <div><dt>Pays</dt><dd x-text="(ti.geolocation?.country || '—') + (ti.geolocation?.country_code ? ' (' + ti.geolocation.country_code + ')' : '')"></dd></div>
+                      <div><dt>Ville / Région</dt><dd x-text="[ti.geolocation?.city, ti.geolocation?.region].filter(Boolean).join(', ') || '—'"></dd></div>
+                      <div><dt>ISP / Org</dt><dd x-text="ti.geolocation?.org || ti.geolocation?.isp || '—'"></dd></div>
+                      <div><dt>ASN</dt><dd class="mono" x-text="ti.geolocation?.asn || '—'"></dd></div>
+                      <div><dt>Fuseau horaire</dt><dd x-text="ti.geolocation?.timezone || '—'"></dd></div>
+                      <div><dt>Datacenter / Hosting</dt><dd x-text="ti.geolocation?.is_hosting ? 'Oui' : 'Non'"></dd></div>
+                    </dl>
+                  </section>
+                  <section class="card">
+                    <div class="card-head"><h2>Domaine (RDAP)</h2></div>
+                    <dl class="kv-list card-body" style="padding-top:8px;padding-bottom:8px">
+                      <div><dt>Domaine</dt><dd class="mono" x-text="ti.domain || '—'"></dd></div>
+                      <div><dt>Registrar</dt><dd x-text="ti.domain_info?.registrar || '—'"></dd></div>
+                      <div><dt>Création</dt><dd x-text="ti.domain_info?.creation_date || '—'"></dd></div>
+                      <div><dt>Expiration</dt><dd x-text="ti.domain_info?.expiry_date || '—'"></dd></div>
+                      <div x-show="ti.domain_info?.age_days !== undefined"><dt>Ancienneté</dt>
+                        <dd :class="ti.domain_info?.age_days < 30 ? 'c-critical' : ti.domain_info?.age_days < 180 ? 'c-medium' : ''" x-text="ti.domain_info?.age_days + ' jours'"></dd></div>
+                      <div x-show="ti.domain_info?.status?.length"><dt>Statut</dt><dd class="mono xs" x-text="ti.domain_info?.status?.join(', ')"></dd></div>
+                    </dl>
+                  </section>
+                  <section class="card" x-show="ti.abuse?.confidence_score !== undefined">
+                    <div class="card-head"><h2>AbuseIPDB</h2></div>
+                    <dl class="kv-list card-body" style="padding-top:8px;padding-bottom:8px">
+                      <div><dt>Score de confiance</dt><dd :class="ti.abuse?.confidence_score >= 50 && 'c-critical'" x-text="ti.abuse?.confidence_score + ' %'"></dd></div>
+                      <div><dt>Signalements</dt><dd x-text="ti.abuse?.total_reports ?? 0"></dd></div>
+                      <div x-show="ti.abuse?.last_reported"><dt>Dernier signalement</dt><dd x-text="ti.abuse?.last_reported"></dd></div>
+                      <div x-show="ti.abuse?.usage_type"><dt>Type d'usage</dt><dd x-text="ti.abuse?.usage_type"></dd></div>
+                      <div><dt>Nœud Tor</dt><dd x-text="ti.abuse?.is_tor ? 'Oui' : 'Non'"></dd></div>
+                    </dl>
+                  </section>
+                  <section class="card">
+                    <div class="card-head"><h2>Listes de blocage DNSBL</h2><p x-text="(ti.blacklists?.listed ?? 0) + ' sur ' + (ti.blacklists?.checked ?? 0)"></p></div>
+                    <div class="table-wrap"><table><tbody>
+                      <template x-for="h in ti.blacklists?.hits || []" :key="h.name">
+                        <tr><td class="mono" x-text="h.name"></td><td class="r"><span class="tag" :class="h.listed ? 'fail' : 'ok'" x-text="h.listed ? 'Listée' : 'Propre'"></span></td></tr>
+                      </template>
+                    </tbody></table></div>
+                  </section>
+                </div>
+
+                <section class="card">
+                  <div class="card-head"><h2>Enregistrements DNS</h2></div>
+                  <div class="table-wrap"><table>
+                    <thead><tr><th style="width:90px">Type</th><th>Valeur(s)</th></tr></thead>
+                    <tbody>
+                      <template x-for="[t, recs] in Object.entries(ti.dns_records || {})" :key="t">
+                        <tr><td class="mono" x-text="t"></td><td class="mono" style="overflow-wrap:anywhere" x-text="[].concat(recs).join(', ')"></td></tr>
+                      </template>
+                      <tr x-show="!Object.keys(ti.dns_records || {}).length"><td colspan="2" class="muted">Aucun enregistrement DNS récupéré.</td></tr>
+                    </tbody>
+                  </table></div>
+                </section>
+              </div>
+            </template>
+          </div>
+
+          <!-- ===== Sous-domaines ===== -->
+          <div class="stack" x-show="activeTab === 'subdomains'">
+            <section class="card empty" x-show="!sub"><p>Données de sous-domaines non disponibles.</p></section>
+            <template x-if="sub">
+              <div class="stack">
+                <div class="note warn" x-show="takeovers.length">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 3l10 18H2L12 3z"/><path d="M12 10v4M12 17.5v.5"/></svg>
+                  <span x-text="takeovers.length + ' sous-domaine(s) exposé(s) à une prise de contrôle : ' + takeovers.map(s => s.subdomain + (s.takeover_service ? ' (' + s.takeover_service + ')' : '')).join(', ') + '.'"></span>
+                </div>
+                <div class="row xs muted" style="gap:8px">
+                  Sources :
+                  <span class="tag" x-text="'crt.sh · ' + (sub.sources?.crtsh ?? 0)"></span>
+                  <span class="tag" x-text="'HackerTarget · ' + (sub.sources?.hackertarget ?? 0)"></span>
+                  <span class="tag" x-text="'Brute-force · ' + (sub.sources?.bruteforce ?? 0)"></span>
+                  <span class="tag" x-text="'DNS · ' + (sub.sources?.dns_records ?? 0)"></span>
+                  <span class="tag" :class="sub.zone_transfer_vulnerable && 'fail'" x-text="'Zone transfer (AXFR) · ' + (sub.zone_transfer_vulnerable ? 'vulnérable' : 'refusé')"></span>
+                  <span class="tag" :class="sub.wildcard_detected && 'warn'" x-text="'Wildcard · ' + (sub.wildcard_detected ? (sub.wildcard_ips || []).join(', ') : 'non détecté')"></span>
+                </div>
+
+                <section class="card">
+                  <div class="card-head">
+                    <h2>Sous-domaines découverts</h2>
+                    <div class="row">
+                      <div class="segmented" role="group" aria-label="Filtrer">
+                        <button type="button" :aria-pressed="subFilter === '' ? 'true' : 'false'" @click="subFilter = ''">Tous</button>
+                        <button type="button" :aria-pressed="subFilter === 'active' ? 'true' : 'false'" @click="subFilter = 'active'">Actifs</button>
+                        <button type="button" :aria-pressed="subFilter === 'takeover' ? 'true' : 'false'" @click="subFilter = 'takeover'">Takeover</button>
+                      </div>
+                      <label class="search">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+                        <input type="search" x-model="subQuery" placeholder="Filtrer" aria-label="Filtrer les sous-domaines">
+                      </label>
+                    </div>
+                  </div>
+                  <div class="table-wrap"><table style="min-width:820px">
+                    <thead><tr><th>Sous-domaine</th><th>HTTP</th><th>IP</th><th>Titre</th><th>Source</th><th class="r">Risque</th></tr></thead>
+                    <tbody>
+                      <template x-for="(s, i) in visibleSubs" :key="i">
+                        <tr>
+                          <td>
+                            <a class="target" x-show="s.status_code != null" target="_blank" rel="noopener" :href="(s.https ? 'https://' : 'http://') + s.subdomain" x-text="s.subdomain"></a>
+                            <span class="mono" x-show="s.status_code == null" x-text="s.subdomain"></span>
+                          </td>
+                          <td><span class="tag mono" :class="httpCls(s.status_code)" x-show="s.status_code != null" x-text="(s.https ? 'TLS · ' : '') + s.status_code"></span><span class="muted" x-show="s.status_code == null">—</span></td>
+                          <td class="mono" x-text="(s.ips || []).slice(0, 2).join(', ') + ((s.ips?.length > 2) ? ' +' + (s.ips.length - 2) : '') || '—'"></td>
+                          <td x-text="s.title ? s.title.slice(0, 60) + (s.title.length > 60 ? '…' : '') : '—'" :title="s.title || ''"></td>
+                          <td class="muted" x-text="srcLabel(s.source)"></td>
+                          <td class="r"><span class="tag fail" x-show="s.takeover_risk" :title="s.takeover_service || ''">Takeover</span></td>
+                        </tr>
+                      </template>
+                      <tr x-show="visibleSubs.length === 0"><td colspan="6" class="muted" style="text-align:center;padding:32px">Aucun sous-domaine ne correspond au filtre.</td></tr>
+                    </tbody>
+                  </table></div>
+                </section>
+              </div>
+            </template>
+          </div>
+
+          <!-- ===== API ===== -->
+          <div class="stack" x-show="activeTab === 'api'">
+            <section class="card empty" x-show="!api"><p>Données API non disponibles.</p></section>
+            <template x-if="api">
+              <div class="stack">
+                <section class="stats">
+                  <div class="stat"><p>Endpoints</p><strong x-text="api.total_endpoints ?? 0"></strong><small>découverts</small></div>
+                  <div class="stat"><p>Critiques</p><strong :class="count('critical') > 0 && 'c-critical'" x-text="count('critical')"></strong><small>constats</small></div>
+                  <div class="stat"><p>Swagger / OpenAPI</p><strong style="font-size:18px;margin-top:10px" x-text="api.swagger_found ? 'Trouvé' : 'Absent'"></strong><small class="mono" x-text="api.swagger_url || ''"></small></div>
+                  <div class="stat"><p>GraphQL</p><strong style="font-size:18px;margin-top:10px" :class="api.graphql_found && 'c-medium'" x-text="api.graphql_found ? 'Détecté' : 'Absent'"></strong></div>
+                </section>
+                <section class="card card-pad stack-sm">
+                  <h2>Couverture OWASP API Top 10 (2023)</h2>
+                  <p class="small muted" x-show="!api.owasp_coverage?.length">Aucune catégorie en échec.</p>
+                  <div class="tags"><template x-for="c in api.owasp_coverage || []" :key="c"><span class="tag fail" x-text="c"></span></template></div>
+                </section>
+                <section class="card">
+                  <div class="card-head"><h2>Endpoints découverts</h2>
+                    <label class="search">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+                      <input type="search" x-model="epQuery" placeholder="Filtrer par chemin" aria-label="Filtrer les endpoints">
+                    </label>
+                  </div>
+                  <div class="table-wrap"><table style="min-width:640px">
+                    <thead><tr><th>Méthode</th><th>Endpoint</th><th>Statut</th><th class="r">Taille</th><th class="r">Latence</th></tr></thead>
+                    <tbody>
+                      <template x-for="(ep, i) in (api.endpoints_found || []).filter(e => !epQuery || (e.path || '').includes(epQuery))" :key="i">
+                        <tr>
+                          <td><span class="tag mono" x-text="ep.method || 'GET'"></span></td>
+                          <td class="mono" style="color:var(--text)" x-text="ep.path || ep.url"></td>
+                          <td><span class="tag mono" :class="httpCls(ep.status_code)" x-text="ep.status_code ?? '—'"></span></td>
+                          <td class="r num" x-text="ep.response_size ? (ep.response_size > 1024 ? (ep.response_size / 1024).toFixed(1) + ' Ko' : ep.response_size + ' o') : '—'"></td>
+                          <td class="r num" x-text="ep.response_time_ms ? ep.response_time_ms + ' ms' : '—'"></td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table></div>
+                </section>
+              </div>
+            </template>
+          </div>
+
+          <!-- ===== OSINT ===== -->
+          <div class="stack" x-show="activeTab === 'osint'">
+            <section class="card empty" x-show="!osint"><p>Données OSINT non disponibles.</p></section>
+            <template x-if="osint">
+              <div class="stack">
+                <section class="stats">
+                  <div class="stat"><p>Emails exposés</p><strong x-text="osint.emails_found?.length ?? 0"></strong><small>trouvés publiquement</small></div>
+                  <div class="stat"><p>Fuites de données</p><strong :class="osint.breach_data?.breaches_found > 0 && 'c-critical'" x-text="osint.breach_data?.breaches_found ?? 0"></strong><small>breaches connues</small></div>
+                  <div class="stat"><p>Exposition GitHub</p><strong :class="osint.github_exposure?.leaks_found > 0 && 'c-medium'" x-text="osint.github_exposure?.leaks_found ?? 0"></strong><small>résultats sensibles</small></div>
+                  <div class="stat"><p>Certificat TLS</p><strong :class="sslCls(osint.ssl_cert?.days_remaining)" x-text="osint.ssl_cert?.days_remaining != null ? osint.ssl_cert.days_remaining + ' j' : '—'"></strong><small>avant expiration</small></div>
+                </section>
+
+                <div class="grid-2">
+                  <section class="card"><div class="card-head"><h2>WHOIS / Domaine</h2></div>
+                    <dl class="kv-list card-body" style="padding-top:8px;padding-bottom:8px">
+                      <div><dt>Registrar</dt><dd x-text="osint.whois?.registrar || '—'"></dd></div>
+                      <div><dt>Organisation</dt><dd x-text="osint.whois?.registrant_org || '—'"></dd></div>
+                      <div><dt>Création</dt><dd x-text="(osint.whois?.created || '—').slice(0, 10)"></dd></div>
+                      <div><dt>Expiration</dt><dd x-text="(osint.whois?.expires || '—').slice(0, 10)"></dd></div>
+                    </dl></section>
+                  <section class="card"><div class="card-head"><h2>Certificat SSL/TLS</h2></div>
+                    <dl class="kv-list card-body" style="padding-top:8px;padding-bottom:8px">
+                      <div><dt>Sujet</dt><dd class="mono" x-text="osint.ssl_cert?.subject || '—'"></dd></div>
+                      <div><dt>Émetteur</dt><dd x-text="osint.ssl_cert?.issuer || '—'"></dd></div>
+                      <div><dt>Expire dans</dt><dd :class="sslCls(osint.ssl_cert?.days_remaining)" x-text="osint.ssl_cert?.days_remaining != null ? osint.ssl_cert.days_remaining + ' jours' : '—'"></dd></div>
+                      <div><dt>Auto-signé</dt><dd :class="osint.ssl_cert?.is_self_signed && 'c-critical'" x-text="osint.ssl_cert?.is_self_signed == null ? '—' : (osint.ssl_cert.is_self_signed ? 'Oui' : 'Non')"></dd></div>
+                    </dl></section>
+                  <section class="card"><div class="card-head"><h2>Infrastructure</h2></div>
+                    <dl class="kv-list card-body" style="padding-top:8px;padding-bottom:8px">
+                      <div><dt>Adresses IP</dt><dd class="mono" x-text="(osint.ip_addresses || []).join(', ') || '—'"></dd></div>
+                      <div><dt>ASN</dt><dd class="mono" x-text="osint.asn_info?.asn || '—'"></dd></div>
+                      <div><dt>Organisation</dt><dd x-text="osint.asn_info?.org || '—'"></dd></div>
+                      <div><dt>Pays</dt><dd x-text="osint.asn_info?.country || osint.geo_info?.country || '—'"></dd></div>
+                    </dl></section>
+                  <section class="card"><div class="card-head"><h2>Technologies détectées</h2></div>
+                    <dl class="kv-list card-body" style="padding-top:8px;padding-bottom:8px">
+                      <div><dt>Serveur</dt><dd class="mono" x-text="osint.technologies?.server || '—'"></dd></div>
+                      <div><dt>X-Powered-By</dt><dd class="mono" x-text="osint.technologies?.powered_by || '—'"></dd></div>
+                      <div><dt>CMS</dt><dd x-text="osint.technologies?.cms || '—'"></dd></div>
+                      <div x-show="osint.technologies?.frameworks?.length"><dt>Frameworks</dt>
+                        <dd><div class="tags" style="justify-content:flex-end"><template x-for="f in osint.technologies?.frameworks || []" :key="f"><span class="tag" x-text="f"></span></template></div></dd></div>
+                    </dl></section>
+                </div>
+
+                <section class="card">
+                  <div class="card-head"><h2>Enregistrements DNS</h2></div>
+                  <div class="table-wrap"><table>
+                    <thead><tr><th style="width:90px">Type</th><th>Valeur(s)</th></tr></thead>
+                    <tbody>
+                      <template x-for="t in ['A','AAAA','MX','NS','TXT','CNAME'].filter(t => (osint.dns_records?.[t] || []).length)" :key="t">
+                        <tr><td class="mono" x-text="t"></td><td class="mono" style="overflow-wrap:anywhere" x-text="osint.dns_records[t].join(', ')"></td></tr>
+                      </template>
+                    </tbody>
+                  </table></div>
+                </section>
+
+                <div class="grid-2">
+                  <section class="card"><div class="card-head"><h2>Emails exposés</h2><p x-text="osint.emails_found?.length ?? 0"></p></div>
+                    <ul class="list" x-show="osint.emails_found?.length">
+                      <template x-for="e in osint.emails_found || []" :key="e"><li style="padding:10px 20px"><span class="mono small" x-text="e"></span></li></template>
+                    </ul>
+                    <p class="card-body small muted" x-show="!osint.emails_found?.length">Aucun email trouvé publiquement.</p>
+                    <div class="card-body" style="border-top:1px solid var(--border)" x-show="osint.breach_data?.breach_names?.length">
+                      <p class="xs muted" style="margin-bottom:6px">Fuites connues</p>
+                      <div class="tags"><template x-for="b in osint.breach_data?.breach_names || []" :key="b"><span class="tag fail" x-text="b"></span></template></div>
+                    </div>
+                  </section>
+                  <section class="card"><div class="card-head"><h2>Ports ouverts</h2><p x-text="osint.open_ports?.length ?? 0"></p></div>
+                    <div class="card-body">
+                      <div class="tags" x-show="osint.open_ports?.length"><template x-for="p in osint.open_ports || []" :key="p"><span class="tag warn mono" x-text="p"></span></template></div>
+                      <p class="small muted" x-show="!osint.open_ports?.length">Aucun port ouvert détecté.</p>
+                      <div x-show="osint.github_exposure?.sample_repos?.length" style="margin-top:16px">
+                        <p class="xs muted" style="margin-bottom:6px">Dépôts GitHub mentionnant le domaine</p>
+                        <div class="tags"><template x-for="r in osint.github_exposure?.sample_repos || []" :key="r"><span class="tag mono" x-text="r"></span></template></div>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+
+                <section class="card" x-show="osint.recommended_dorks?.length">
+                  <div class="card-head"><h2>Google Dorks recommandés</h2><p>Recherches à lancer manuellement</p></div>
+                  <ul class="list">
+                    <template x-for="d in osint.recommended_dorks || []" :key="d">
+                      <li style="padding:10px 20px;align-items:center">
+                        <code style="flex:1;overflow-wrap:anywhere" x-text="d"></code>
+                        <a class="small" target="_blank" rel="noopener" :href="'https://www.google.com/search?q=' + encodeURIComponent(d)">Ouvrir</a>
                       </li>
                     </template>
-                  </ol>
-                </div>
-
-                <!-- Impact -->
-                <div x-show="ap.impact"
-                     class="flex items-start gap-2.5 text-sm text-red-700 dark:text-red-300
-                            bg-red-50 dark:bg-red-900/10
-                            border border-red-200 dark:border-red-900/50
-                            rounded-xl px-4 py-3 mb-4">
-                  <svg class="mt-0.5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                    <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                  </svg>
-                  <span><strong>Impact :</strong> <span x-text="ap.impact"></span></span>
-                </div>
-
-                <!-- MITRE ATT&CK Techniques (from AI) -->
-                <div x-show="ap.mitre_techniques?.length">
-                  <p class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2.5">MITRE ATT&CK</p>
-                  <div class="flex flex-wrap gap-2">
-                    <template x-for="(tech, ti) in ap.mitre_techniques || []" :key="ti">
-                      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold
-                                   bg-orange-50 dark:bg-orange-900/20
-                                   text-orange-700 dark:text-orange-400
-                                   border border-orange-200 dark:border-orange-800"
-                            x-text="tech"></span>
-                    </template>
-                  </div>
-                </div>
+                  </ul>
+                </section>
               </div>
             </template>
           </div>
+
         </div>
-
-        <!-- ===== TAB: THREAT INTEL (CTI) ===== -->
-        <div x-show="activeTab === 'threat_intel'" x-cloak class="mt-4 space-y-4">
-
-          <!-- Threat Score Banner -->
-          <template x-if="scan.threat_intel">
-            <div>
-              <!-- Score + niveau -->
-              <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm mb-4">
-                <div class="flex items-center justify-between flex-wrap gap-4">
-                  <div>
-                    <p class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Score de menace global</p>
-                    <div class="flex items-end gap-2">
-                      <span class="text-5xl font-bold"
-                            :class="{
-                              'text-red-500': scan.threat_intel.threat_score >= 8,
-                              'text-orange-500': scan.threat_intel.threat_score >= 6 && scan.threat_intel.threat_score < 8,
-                              'text-amber-500': scan.threat_intel.threat_score >= 3 && scan.threat_intel.threat_score < 6,
-                              'text-green-500': scan.threat_intel.threat_score < 3
-                            }"
-                            x-text="scan.threat_intel.threat_score.toFixed(1)"></span>
-                      <span class="text-gray-400 text-lg mb-1">/10</span>
-                    </div>
-                  </div>
-                  <div class="flex flex-col items-end gap-2">
-                    <span class="px-3 py-1.5 rounded-xl text-sm font-bold uppercase tracking-wide"
-                          :class="{
-                            'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400': scan.threat_intel.risk_level === 'critical',
-                            'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400': scan.threat_intel.risk_level === 'high',
-                            'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400': scan.threat_intel.risk_level === 'medium',
-                            'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400': scan.threat_intel.risk_level === 'low',
-                            'bg-gray-100 dark:bg-gray-800 text-gray-500': scan.threat_intel.risk_level === 'info'
-                          }"
-                          x-text="({critical:'Critique', high:'Élevé', medium:'Moyen', low:'Faible', info:'Info'})[scan.threat_intel.risk_level] || scan.threat_intel.risk_level"></span>
-                    <p class="text-xs text-gray-500 font-mono" x-text="'IP : ' + (scan.threat_intel.ip || '—')"></p>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Grid : Géolocalisation + Domaine -->
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-
-                <!-- Géolocalisation -->
-                <div x-show="scan.threat_intel.geolocation?.country"
-                     class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
-                  <div class="flex items-center gap-2 mb-4">
-                    <div class="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
-                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-                      </svg>
-                    </div>
-                    <p class="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Géolocalisation</p>
-                  </div>
-                  <dl class="space-y-2 text-sm">
-                    <div class="flex justify-between gap-2">
-                      <dt class="text-gray-500">Pays</dt>
-                      <dd class="font-medium text-gray-900 dark:text-white text-right" x-text="scan.threat_intel.geolocation.country + ' (' + scan.threat_intel.geolocation.country_code + ')'"></dd>
-                    </div>
-                    <div class="flex justify-between gap-2">
-                      <dt class="text-gray-500">Ville</dt>
-                      <dd class="font-medium text-gray-900 dark:text-white text-right" x-text="(scan.threat_intel.geolocation.city || '—') + ', ' + (scan.threat_intel.geolocation.region || '')"></dd>
-                    </div>
-                    <div class="flex justify-between gap-2">
-                      <dt class="text-gray-500">ISP / Org</dt>
-                      <dd class="font-medium text-gray-900 dark:text-white text-right truncate max-w-xs" x-text="scan.threat_intel.geolocation.org || scan.threat_intel.geolocation.isp || '—'"></dd>
-                    </div>
-                    <div class="flex justify-between gap-2">
-                      <dt class="text-gray-500">ASN</dt>
-                      <dd class="font-mono text-xs text-gray-700 dark:text-gray-300 text-right" x-text="scan.threat_intel.geolocation.asn || '—'"></dd>
-                    </div>
-                    <div class="flex justify-between gap-2">
-                      <dt class="text-gray-500">Fuseau horaire</dt>
-                      <dd class="font-medium text-gray-900 dark:text-white text-right" x-text="scan.threat_intel.geolocation.timezone || '—'"></dd>
-                    </div>
-                    <div class="flex justify-between gap-2" x-show="scan.threat_intel.geolocation.is_hosting">
-                      <dt class="text-gray-500">Type</dt>
-                      <dd><span class="px-2 py-0.5 rounded-lg text-xs font-semibold bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400">Datacenter / Hosting</span></dd>
-                    </div>
-                  </dl>
-                </div>
-
-                <!-- Infos domaine (RDAP) -->
-                <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
-                  <div class="flex items-center gap-2 mb-4">
-                    <div class="w-7 h-7 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2">
-                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-                      </svg>
-                    </div>
-                    <p class="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Informations Domaine</p>
-                  </div>
-                  <dl class="space-y-2 text-sm">
-                    <div class="flex justify-between gap-2">
-                      <dt class="text-gray-500">Domaine</dt>
-                      <dd class="font-mono text-gray-900 dark:text-white" x-text="scan.threat_intel.domain"></dd>
-                    </div>
-                    <div class="flex justify-between gap-2" x-show="scan.threat_intel.domain_info?.registrar">
-                      <dt class="text-gray-500">Registrar</dt>
-                      <dd class="font-medium text-gray-900 dark:text-white text-right truncate max-w-xs" x-text="scan.threat_intel.domain_info?.registrar"></dd>
-                    </div>
-                    <div class="flex justify-between gap-2" x-show="scan.threat_intel.domain_info?.creation_date">
-                      <dt class="text-gray-500">Créé le</dt>
-                      <dd class="font-medium text-gray-900 dark:text-white" x-text="scan.threat_intel.domain_info?.creation_date"></dd>
-                    </div>
-                    <div class="flex justify-between gap-2" x-show="scan.threat_intel.domain_info?.expiry_date">
-                      <dt class="text-gray-500">Expiration</dt>
-                      <dd class="font-medium text-gray-900 dark:text-white" x-text="scan.threat_intel.domain_info?.expiry_date"></dd>
-                    </div>
-                    <div class="flex justify-between gap-2" x-show="scan.threat_intel.domain_info?.age_days !== undefined">
-                      <dt class="text-gray-500">Ancienneté</dt>
-                      <dd>
-                        <span class="font-medium" x-text="scan.threat_intel.domain_info?.age_days + ' jours'"
-                              :class="scan.threat_intel.domain_info?.age_days < 30 ? 'text-red-500' : scan.threat_intel.domain_info?.age_days < 180 ? 'text-amber-500' : 'text-green-500'"></span>
-                      </dd>
-                    </div>
-                    <div class="flex justify-between gap-2" x-show="scan.threat_intel.domain_info?.status?.length">
-                      <dt class="text-gray-500">Statut</dt>
-                      <dd class="font-medium text-gray-900 dark:text-white text-right" x-text="scan.threat_intel.domain_info?.status?.join(', ')"></dd>
-                    </div>
-                  </dl>
-                </div>
-              </div>
-
-              <!-- DNS Records -->
-              <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm mb-4">
-                <div class="flex items-center gap-2 mb-4">
-                  <div class="w-7 h-7 rounded-lg bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" stroke-width="2">
-                      <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
-                    </svg>
-                  </div>
-                  <p class="text-xs font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wider">Enregistrements DNS</p>
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <template x-for="[type, records] in Object.entries(scan.threat_intel.dns_records || {})" :key="type">
-                    <div class="rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700/50 p-3">
-                      <p class="text-xs font-bold text-gray-500 dark:text-gray-400 mb-2 uppercase" x-text="type"></p>
-                      <template x-for="(rec, i) in records" :key="i">
-                        <p class="font-mono text-xs text-gray-700 dark:text-gray-300 truncate" x-text="rec"></p>
-                      </template>
-                    </div>
-                  </template>
-                  <div x-show="!Object.keys(scan.threat_intel.dns_records || {}).length"
-                       class="col-span-2 text-sm text-gray-400 italic">
-                    Aucun enregistrement DNS récupéré.
-                  </div>
-                </div>
-              </div>
-
-              <!-- Blacklists DNSBL -->
-              <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm mb-4">
-                <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
-                  <div class="flex items-center gap-2">
-                    <div class="w-7 h-7 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2">
-                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                        <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                      </svg>
-                    </div>
-                    <p class="text-xs font-bold text-red-600 dark:text-red-400 uppercase tracking-wider">Blacklists DNSBL</p>
-                  </div>
-                  <div class="flex items-center gap-2 text-sm">
-                    <span class="text-gray-500" x-text="scan.threat_intel.blacklists?.checked + ' listes vérifiées'"></span>
-                    <span class="font-bold px-2 py-0.5 rounded-lg text-xs"
-                          :class="scan.threat_intel.blacklists?.listed > 0
-                            ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
-                            : 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'"
-                          x-text="scan.threat_intel.blacklists?.listed + ' présence(s)'"></span>
-                  </div>
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <template x-for="hit in scan.threat_intel.blacklists?.hits || []" :key="hit.name">
-                    <div class="flex items-center justify-between px-3 py-2 rounded-xl border"
-                         :class="hit.listed
-                           ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-                           : 'bg-gray-50 dark:bg-gray-800/50 border-gray-100 dark:border-gray-700/50'">
-                      <span class="text-xs font-medium text-gray-700 dark:text-gray-300" x-text="hit.name"></span>
-                      <span class="text-xs font-bold px-2 py-0.5 rounded-full"
-                            :class="hit.listed
-                              ? 'bg-red-500 text-white'
-                              : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'"
-                            x-text="hit.listed ? 'LISTÉ' : 'OK'"></span>
-                    </div>
-                  </template>
-                </div>
-              </div>
-
-              <!-- AbuseIPDB (si disponible) -->
-              <div x-show="scan.threat_intel.abuse?.confidence_score !== undefined"
-                   class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
-                <div class="flex items-center gap-2 mb-4">
-                  <div class="w-7 h-7 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2">
-                      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                    </svg>
-                  </div>
-                  <p class="text-xs font-bold text-orange-600 dark:text-orange-400 uppercase tracking-wider">AbuseIPDB</p>
-                </div>
-                <dl class="space-y-2 text-sm">
-                  <div class="flex justify-between">
-                    <dt class="text-gray-500">Score d'abus</dt>
-                    <dd class="font-bold"
-                        :class="scan.threat_intel.abuse.confidence_score >= 80 ? 'text-red-500' : scan.threat_intel.abuse.confidence_score >= 50 ? 'text-orange-500' : 'text-green-500'"
-                        x-text="scan.threat_intel.abuse.confidence_score + '%'"></dd>
-                  </div>
-                  <div class="flex justify-between">
-                    <dt class="text-gray-500">Signalements</dt>
-                    <dd class="font-medium text-gray-900 dark:text-white" x-text="scan.threat_intel.abuse.total_reports"></dd>
-                  </div>
-                  <div class="flex justify-between" x-show="scan.threat_intel.abuse.last_reported">
-                    <dt class="text-gray-500">Dernier rapport</dt>
-                    <dd class="font-medium text-gray-900 dark:text-white" x-text="scan.threat_intel.abuse.last_reported"></dd>
-                  </div>
-                  <div class="flex justify-between" x-show="scan.threat_intel.abuse.usage_type">
-                    <dt class="text-gray-500">Type d'utilisation</dt>
-                    <dd class="font-medium text-gray-900 dark:text-white" x-text="scan.threat_intel.abuse.usage_type"></dd>
-                  </div>
-                  <div class="flex justify-between" x-show="scan.threat_intel.abuse.is_tor">
-                    <dt class="text-gray-500">Nœud Tor</dt>
-                    <dd><span class="px-2 py-0.5 rounded-lg text-xs font-semibold bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">Oui</span></dd>
-                  </div>
-                </dl>
-              </div>
-            </div>
-          </template>
-
-          <div x-show="!scan.threat_intel"
-               class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-12 text-center text-gray-500 shadow-sm">
-            Données Threat Intelligence non disponibles.
-          </div>
-        </div>
-
-        <!-- ===== TAB: CONFORMITÉ ===== -->
-        <div x-show="activeTab === 'compliance'" x-cloak class="mt-4 space-y-5">
-          <template x-if="scan.compliance_reports">
-
-            <!-- Score global -->
-            <div>
-              <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm mb-4">
-                <div class="flex items-center justify-between flex-wrap gap-4 mb-4">
-                  <div>
-                    <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Score de conformité global</p>
-                    <div class="flex items-end gap-2">
-                      <span class="text-5xl font-bold"
-                            :class="{
-                              'text-green-500': scan.compliance_reports.global_score >= 80,
-                              'text-amber-500': scan.compliance_reports.global_score >= 60 && scan.compliance_reports.global_score < 80,
-                              'text-orange-500': scan.compliance_reports.global_score >= 40 && scan.compliance_reports.global_score < 60,
-                              'text-red-500': scan.compliance_reports.global_score < 40
-                            }"
-                            x-text="scan.compliance_reports.global_score.toFixed(0)"></span>
-                      <span class="text-gray-400 text-lg mb-1">/100</span>
-                    </div>
-                  </div>
-                  <div class="flex flex-col items-end gap-2">
-                    <span class="text-4xl font-black"
-                          :class="{
-                            'text-green-500': ['A+','A'].includes(scan.compliance_reports.global_grade),
-                            'text-amber-500': scan.compliance_reports.global_grade === 'B',
-                            'text-orange-500': scan.compliance_reports.global_grade === 'C',
-                            'text-red-500': ['D','F'].includes(scan.compliance_reports.global_grade)
-                          }"
-                          x-text="scan.compliance_reports.global_grade"></span>
-                    <p class="text-xs text-gray-500" x-text="scan.compliance_reports.summary"></p>
-                  </div>
-                </div>
-
-                <!-- Mini scores par framework -->
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <template x-for="fw in scan.compliance_reports.frameworks" :key="fw.framework">
-                    <div class="rounded-xl p-3 border text-center"
-                         :class="{
-                           'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800': fw.overall_score >= 80,
-                           'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800': fw.overall_score >= 60 && fw.overall_score < 80,
-                           'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800': fw.overall_score >= 40 && fw.overall_score < 60,
-                           'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800': fw.overall_score < 40
-                         }">
-                      <p class="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1" x-text="fw.framework + ' ' + fw.version"></p>
-                      <p class="text-2xl font-black"
-                         :class="{
-                           'text-green-600 dark:text-green-400': fw.overall_score >= 80,
-                           'text-amber-600 dark:text-amber-400': fw.overall_score >= 60 && fw.overall_score < 80,
-                           'text-orange-600 dark:text-orange-400': fw.overall_score >= 40 && fw.overall_score < 60,
-                           'text-red-600 dark:text-red-400': fw.overall_score < 40
-                         }"
-                         x-text="fw.grade"></p>
-                      <p class="text-xs text-gray-500 mt-0.5" x-text="fw.overall_score.toFixed(0) + '/100'"></p>
-                      <p class="text-xs mt-1">
-                        <span class="text-green-600 font-medium" x-text="fw.passed + ' ✓'"></span>
-                        <span class="text-gray-400 mx-0.5">/</span>
-                        <span class="text-red-500 font-medium" x-text="fw.failed + ' ✗'"></span>
-                        <span x-show="fw.partial > 0" class="text-amber-500 font-medium" x-text="' / ' + fw.partial + ' ~'"></span>
-                      </p>
-                    </div>
-                  </template>
-                </div>
-              </div>
-
-              <!-- Détail par framework -->
-              <template x-for="fw in scan.compliance_reports.frameworks" :key="fw.framework">
-                <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm overflow-hidden mb-4">
-
-                  <!-- Framework header -->
-                  <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800">
-                    <div class="flex items-center gap-3">
-                      <div class="w-8 h-8 rounded-lg flex items-center justify-center"
-                           :class="{
-                             'bg-green-100 dark:bg-green-900/30': fw.overall_score >= 80,
-                             'bg-amber-100 dark:bg-amber-900/30': fw.overall_score >= 60 && fw.overall_score < 80,
-                             'bg-orange-100 dark:bg-orange-900/30': fw.overall_score >= 40 && fw.overall_score < 60,
-                             'bg-red-100 dark:bg-red-900/30': fw.overall_score < 40
-                           }">
-                        <span class="text-sm font-black"
-                              :class="{
-                                'text-green-600 dark:text-green-400': fw.overall_score >= 80,
-                                'text-amber-600 dark:text-amber-400': fw.overall_score >= 60 && fw.overall_score < 80,
-                                'text-orange-600 dark:text-orange-400': fw.overall_score >= 40 && fw.overall_score < 60,
-                                'text-red-600 dark:text-red-400': fw.overall_score < 40
-                              }"
-                              x-text="fw.grade"></span>
-                      </div>
-                      <div>
-                        <p class="text-sm font-bold text-gray-900 dark:text-white" x-text="fw.framework + ' ' + fw.version"></p>
-                        <p class="text-xs text-gray-500" x-text="fw.compliance_statement"></p>
-                      </div>
-                    </div>
-                    <span class="text-2xl font-black"
-                          :class="{
-                            'text-green-500': fw.overall_score >= 80,
-                            'text-amber-500': fw.overall_score >= 60 && fw.overall_score < 80,
-                            'text-orange-500': fw.overall_score >= 40 && fw.overall_score < 60,
-                            'text-red-500': fw.overall_score < 40
-                          }"
-                          x-text="fw.overall_score.toFixed(0) + '/100'"></span>
-                  </div>
-
-                  <!-- Contrôles -->
-                  <div class="divide-y divide-gray-100 dark:divide-gray-800">
-                    <template x-for="ctrl in fw.controls" :key="ctrl.id">
-                      <div class="px-5 py-4">
-                        <!-- Contrôle header -->
-                        <div class="flex items-start justify-between gap-3 mb-2">
-                          <div class="flex items-center gap-2.5 flex-1 min-w-0">
-                            <!-- Status icon -->
-                            <div class="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
-                                 :class="{
-                                   'bg-green-100 dark:bg-green-900/30': ctrl.status === 'pass',
-                                   'bg-red-100 dark:bg-red-900/30': ctrl.status === 'fail',
-                                   'bg-amber-100 dark:bg-amber-900/30': ctrl.status === 'partial',
-                                   'bg-gray-100 dark:bg-gray-800': ctrl.status === 'na'
-                                 }">
-                              <template x-if="ctrl.status === 'pass'">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
-                              </template>
-                              <template x-if="ctrl.status === 'fail'">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                              </template>
-                              <template x-if="ctrl.status === 'partial'">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="3"><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                              </template>
-                              <template x-if="ctrl.status === 'na'">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2"><circle cx="12" cy="12" r="1"/></svg>
-                              </template>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                              <div class="flex items-center gap-2 flex-wrap">
-                                <span class="text-xs font-mono text-gray-400" x-text="ctrl.id"></span>
-                                <span class="text-sm font-semibold text-gray-900 dark:text-white" x-text="ctrl.title"></span>
-                              </div>
-                              <p class="text-xs text-gray-500 mt-0.5" x-text="ctrl.category"></p>
-                            </div>
-                          </div>
-                          <div class="flex items-center gap-2 flex-shrink-0">
-                            <span class="text-xs font-bold px-2 py-1 rounded-lg"
-                                  :class="{
-                                    'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400': ctrl.status === 'pass',
-                                    'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400': ctrl.status === 'fail',
-                                    'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400': ctrl.status === 'partial',
-                                    'bg-gray-100 dark:bg-gray-800 text-gray-500': ctrl.status === 'na'
-                                  }"
-                                  x-text="({pass:'CONFORME', fail:'NON CONFORME', partial:'PARTIEL', na:'N/A'})[ctrl.status]"></span>
-                            <span class="text-sm font-bold w-10 text-right"
-                                  :class="{
-                                    'text-green-600': ctrl.score >= 80,
-                                    'text-amber-500': ctrl.score >= 50 && ctrl.score < 80,
-                                    'text-red-500': ctrl.score < 50
-                                  }"
-                                  x-text="ctrl.score + '%'"></span>
-                          </div>
-                        </div>
-
-                        <!-- Détails dépliables -->
-                        <div x-data="{ open: ctrl.status === 'fail' || ctrl.status === 'partial' }">
-                          <button @click="open = !open"
-                                  class="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors mt-1 mb-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                 :class="open ? 'rotate-180' : ''" class="transition-transform">
-                              <polyline points="6 9 12 15 18 9"/>
-                            </svg>
-                            <span x-text="open ? 'Masquer les détails' : 'Voir exigence, preuves et remédiation'"></span>
-                          </button>
-
-                          <div x-show="open" x-collapse class="space-y-3">
-                            <!-- Exigence -->
-                            <div class="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-3 border-l-2 border-indigo-300 dark:border-indigo-700">
-                              <p class="text-xs font-bold text-indigo-600 dark:text-indigo-400 mb-1 uppercase tracking-wide">Exigence du standard</p>
-                              <p class="text-xs text-gray-600 dark:text-gray-400 leading-relaxed" x-text="ctrl.requirement"></p>
-                            </div>
-
-                            <!-- Preuves -->
-                            <div x-show="ctrl.evidence?.length">
-                              <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Preuves du scan</p>
-                              <template x-for="(ev, i) in ctrl.evidence" :key="i">
-                                <div class="flex items-start gap-2 text-xs py-1">
-                                  <span class="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0"
-                                        :class="ev.startsWith('[CRITICAL]') ? 'bg-red-500' : ev.startsWith('[HIGH]') ? 'bg-orange-500' : ev.startsWith('[MEDIUM]') ? 'bg-amber-500' : 'bg-gray-400'"></span>
-                                  <span class="text-gray-600 dark:text-gray-400 font-mono" x-text="ev"></span>
-                                </div>
-                              </template>
-                            </div>
-
-                            <!-- Impact -->
-                            <div class="bg-orange-50 dark:bg-orange-900/10 rounded-xl p-3 border border-orange-100 dark:border-orange-900/30">
-                              <p class="text-xs font-bold text-orange-600 dark:text-orange-400 mb-1 uppercase tracking-wide">Impact business / légal</p>
-                              <p class="text-xs text-gray-600 dark:text-gray-400 leading-relaxed" x-text="ctrl.impact"></p>
-                            </div>
-
-                            <!-- Remédiation -->
-                            <div x-show="ctrl.status !== 'pass'">
-                              <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Plan de remédiation</p>
-                              <template x-for="(step, i) in ctrl.remediation" :key="i">
-                                <div class="flex items-start gap-2 text-xs py-1">
-                                  <span class="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold flex-shrink-0 mt-0.5" x-text="i + 1"></span>
-                                  <span class="text-gray-700 dark:text-gray-300" x-text="step"></span>
-                                </div>
-                              </template>
-                            </div>
-
-                            <!-- CWE refs -->
-                            <div x-show="ctrl.cwe_references?.length" class="flex flex-wrap gap-1.5">
-                              <template x-for="cwe in ctrl.cwe_references" :key="cwe">
-                                <a :href="'https://cwe.mitre.org/data/definitions/' + cwe.replace('CWE-','')+'.html'"
-                                   target="_blank"
-                                   class="px-2 py-0.5 rounded-lg text-xs font-mono font-semibold
-                                          bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400
-                                          border border-purple-200 dark:border-purple-800
-                                          hover:bg-purple-100 transition-colors"
-                                   x-text="cwe"></a>
-                              </template>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </template>
-                  </div>
-                </div>
-              </template>
-            </div>
-          </template>
-
-          <div x-show="!scan.compliance_reports"
-               class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-12 text-center text-gray-500 shadow-sm">
-            Rapport de conformité non disponible pour ce type de scan.
-          </div>
-        </div>
-
-        <!-- ===== TAB: SOUS-DOMAINES ===== -->
-        <div x-show="activeTab === 'subdomains'" x-cloak class="mt-4 space-y-4">
-
-          <template x-if="scan.subdomain_results">
-            <div>
-              <!-- Summary cards -->
-              <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                <div class="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-2xl p-4 text-center">
-                  <p class="text-xs font-bold text-violet-500 uppercase tracking-wider mb-1">Total</p>
-                  <p class="text-3xl font-bold text-violet-600 dark:text-violet-400" x-text="scan.subdomain_results.total_found"></p>
-                  <p class="text-xs text-gray-500 mt-0.5">sous-domaines</p>
-                </div>
-                <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 text-center shadow-sm">
-                  <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Actifs HTTP</p>
-                  <p class="text-3xl font-bold text-gray-900 dark:text-white" x-text="scan.subdomain_results.summary?.active_http ?? '—'"></p>
-                  <p class="text-xs text-gray-500 mt-0.5">répondent</p>
-                </div>
-                <div class="rounded-2xl p-4 text-center border"
-                     :class="scan.subdomain_results.summary?.takeover_risks > 0
-                       ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-                       : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'">
-                  <p class="text-xs font-bold uppercase tracking-wider mb-1"
-                     :class="scan.subdomain_results.summary?.takeover_risks > 0 ? 'text-red-500' : 'text-green-500'">
-                    Takeover Risks
-                  </p>
-                  <p class="text-3xl font-bold"
-                     :class="scan.subdomain_results.summary?.takeover_risks > 0
-                       ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'"
-                     x-text="scan.subdomain_results.summary?.takeover_risks ?? 0"></p>
-                  <p class="text-xs text-gray-500 mt-0.5">à corriger</p>
-                </div>
-                <div class="rounded-2xl p-4 text-center border"
-                     :class="scan.subdomain_results.zone_transfer_vulnerable
-                       ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-                       : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'">
-                  <p class="text-xs font-bold uppercase tracking-wider mb-1"
-                     :class="scan.subdomain_results.zone_transfer_vulnerable ? 'text-red-500' : 'text-green-500'">
-                    Zone Transfer
-                  </p>
-                  <p class="text-base font-black mt-2"
-                     :class="scan.subdomain_results.zone_transfer_vulnerable
-                       ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'"
-                     x-text="scan.subdomain_results.zone_transfer_vulnerable ? 'VULNÉRABLE' : 'Sécurisé'"></p>
-                  <p class="text-xs text-gray-500 mt-1">AXFR</p>
-                </div>
-              </div>
-
-              <!-- Badges: wildcard + sources -->
-              <div class="flex flex-wrap gap-2 mb-4">
-                <span x-show="scan.subdomain_results.wildcard_detected"
-                      class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold
-                             bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300
-                             border border-amber-200 dark:border-amber-800">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                  </svg>
-                  Wildcard DNS détecté
-                  <span class="font-mono text-amber-600 dark:text-amber-400" x-text="'→ ' + scan.subdomain_results.wildcard_ips?.join(', ')"></span>
-                </span>
-                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400">
-                  crt.sh <strong x-text="scan.subdomain_results.sources?.crtsh ?? 0"></strong>
-                </span>
-                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">
-                  HackerTarget <strong x-text="scan.subdomain_results.sources?.hackertarget ?? 0"></strong>
-                </span>
-                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
-                  Brute-force <strong x-text="scan.subdomain_results.sources?.bruteforce ?? 0"></strong>
-                </span>
-                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">
-                  DNS records <strong x-text="scan.subdomain_results.sources?.dns_records ?? 0"></strong>
-                </span>
-              </div>
-
-              <!-- Subdomains table -->
-              <div x-data="{ subSearch: '', subFilterSource: '', subFilterStatus: '' }"
-                   class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm overflow-hidden">
-
-                <!-- Table toolbar -->
-                <div class="px-5 py-3 border-b border-gray-100 dark:border-gray-800 flex flex-wrap items-center gap-3">
-                  <p class="text-sm font-semibold text-gray-900 dark:text-white">Sous-domaines</p>
-                  <span class="text-xs bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 px-2 py-0.5 rounded-full font-medium"
-                        x-text="scan.subdomain_results.total_found + ' total'"></span>
-                  <div class="flex-1"></div>
-                  <input type="text" x-model="subSearch" placeholder="Filtrer..."
-                         class="px-3 py-1.5 text-xs rounded-xl border border-gray-200 dark:border-gray-700
-                                bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white
-                                focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500
-                                w-44 transition-colors" />
-                  <select x-model="subFilterSource"
-                          class="px-3 py-1.5 text-xs rounded-xl border border-gray-200 dark:border-gray-700
-                                 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white
-                                 focus:outline-none focus:ring-2 focus:ring-violet-500/30 transition-colors">
-                    <option value="">Toutes sources</option>
-                    <option value="crt.sh">crt.sh</option>
-                    <option value="hackertarget">HackerTarget</option>
-                    <option value="bruteforce">Brute-force</option>
-                    <option value="dns_records">DNS records</option>
-                    <option value="zone_transfer">Zone Transfer</option>
-                  </select>
-                </div>
-
-                <!-- Table -->
-                <div class="overflow-x-auto">
-                  <table class="w-full text-xs">
-                    <thead class="bg-gray-50 dark:bg-gray-800/60">
-                      <tr>
-                        <th class="text-left px-4 py-2.5 font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Sous-domaine</th>
-                        <th class="text-left px-4 py-2.5 font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden md:table-cell">IPs</th>
-                        <th class="text-center px-4 py-2.5 font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">HTTP</th>
-                        <th class="text-left px-4 py-2.5 font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden lg:table-cell">Titre</th>
-                        <th class="text-center px-4 py-2.5 font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Source</th>
-                        <th class="text-center px-4 py-2.5 font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Flags</th>
-                      </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                      <template x-for="(sub, i) in (scan.subdomain_results.subdomains || []).filter(s =>
-                          (!subSearch || s.subdomain.toLowerCase().includes(subSearch.toLowerCase())) &&
-                          (!subFilterSource || s.source === subFilterSource)
-                        )" :key="i">
-                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors"
-                            :class="sub.takeover_risk ? 'bg-red-50/40 dark:bg-red-900/10' : ''">
-
-                          <!-- Name -->
-                          <td class="px-4 py-2.5">
-                            <div class="flex items-center gap-2">
-                              <span x-show="sub.takeover_risk" class="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0 animate-pulse"></span>
-                              <template x-if="sub.status_code != null">
-                                <a :href="(sub.https ? 'https://' : 'http://') + sub.subdomain"
-                                   target="_blank" rel="noopener"
-                                   class="font-mono text-violet-600 dark:text-violet-400 hover:underline"
-                                   x-text="sub.subdomain"></a>
-                              </template>
-                              <template x-if="sub.status_code == null">
-                                <span class="font-mono text-gray-600 dark:text-gray-400" x-text="sub.subdomain"></span>
-                              </template>
-                            </div>
-                          </td>
-
-                          <!-- IPs -->
-                          <td class="px-4 py-2.5 font-mono text-gray-500 dark:text-gray-400 hidden md:table-cell"
-                              x-text="(sub.ips || []).slice(0,2).join(', ') + ((sub.ips?.length > 2) ? ' +' + (sub.ips.length-2) : '') || '—'"></td>
-
-                          <!-- Status code -->
-                          <td class="px-4 py-2.5 text-center">
-                            <template x-if="sub.status_code != null">
-                              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg font-bold"
-                                    :class="{
-                                      'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400': sub.status_code >= 200 && sub.status_code < 300,
-                                      'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400': sub.status_code >= 300 && sub.status_code < 400,
-                                      'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400': sub.status_code >= 400 && sub.status_code < 500,
-                                      'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400': sub.status_code >= 500
-                                    }">
-                                <template x-if="sub.https">
-                                  <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="text-green-500">
-                                    <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                                  </svg>
-                                </template>
-                                <span x-text="sub.status_code"></span>
-                              </span>
-                            </template>
-                            <template x-if="sub.status_code == null">
-                              <span class="text-gray-400">—</span>
-                            </template>
-                          </td>
-
-                          <!-- Title -->
-                          <td class="px-4 py-2.5 text-gray-600 dark:text-gray-400 hidden lg:table-cell max-w-xs">
-                            <span class="truncate block" :title="sub.title || ''" x-text="sub.title ? sub.title.slice(0,60) + (sub.title.length > 60 ? '…' : '') : '—'"></span>
-                          </td>
-
-                          <!-- Source -->
-                          <td class="px-4 py-2.5 text-center">
-                            <span class="px-2 py-0.5 rounded-lg text-xs font-medium"
-                                  :class="{
-                                    'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400': sub.source === 'crt.sh',
-                                    'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400': sub.source === 'hackertarget',
-                                    'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400': sub.source === 'bruteforce',
-                                    'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400': sub.source === 'dns_records',
-                                    'bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400': sub.source === 'zone_transfer',
-                                  }"
-                                  x-text="sub.source === 'bruteforce' ? 'brute' : sub.source"></span>
-                          </td>
-
-                          <!-- Flags -->
-                          <td class="px-4 py-2.5 text-center">
-                            <div class="flex items-center justify-center gap-1 flex-wrap">
-                              <span x-show="sub.takeover_risk"
-                                    class="px-1.5 py-0.5 rounded text-[10px] font-black bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 uppercase tracking-wide"
-                                    :title="'Takeover: ' + sub.takeover_service">TAKEOVER</span>
-                              <template x-for="(tech, ti) in (sub.technologies || [])" :key="ti">
-                                <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400"
-                                      x-text="tech"></span>
-                              </template>
-                            </div>
-                          </td>
-                        </tr>
-                      </template>
-                      <tr x-show="(scan.subdomain_results.subdomains || []).filter(s =>
-                          (!subSearch || s.subdomain.toLowerCase().includes(subSearch.toLowerCase())) &&
-                          (!subFilterSource || s.source === subFilterSource)
-                        ).length === 0">
-                        <td colspan="6" class="px-4 py-10 text-center text-gray-400 text-sm">
-                          Aucun sous-domaine ne correspond aux filtres.
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          </template>
-
-          <div x-show="!scan.subdomain_results"
-               class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-12 text-center text-gray-500 shadow-sm">
-            Données de reconnaissance de sous-domaines non disponibles pour ce type de scan.
-          </div>
-        </div>
-
-        <!-- ===== TAB: API SECURITY ===== -->
-        <div x-show="activeTab === 'api'" x-cloak class="mt-4 space-y-4">
-          <template x-if="scan.api_results">
-            <div>
-              <!-- Summary cards -->
-              <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                <div class="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-2xl p-4 text-center">
-                  <p class="text-xs font-bold text-orange-500 uppercase tracking-wider mb-1">Endpoints</p>
-                  <p class="text-3xl font-bold text-orange-600 dark:text-orange-400" x-text="scan.api_results.total_endpoints"></p>
-                  <p class="text-xs text-gray-500 mt-0.5">découverts</p>
-                </div>
-                <div class="rounded-2xl p-4 text-center border"
-                     :class="scan.vulnerabilities?.filter(v=>v.severity==='critical').length > 0
-                       ? 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20'
-                       : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900'">
-                  <p class="text-xs font-bold uppercase tracking-wider mb-1"
-                     :class="scan.vulnerabilities?.filter(v=>v.severity==='critical').length > 0 ? 'text-red-500' : 'text-gray-500'">Critiques</p>
-                  <p class="text-3xl font-bold text-gray-900 dark:text-white" x-text="scan.vulnerabilities?.filter(v=>v.severity==='critical').length ?? 0"></p>
-                  <p class="text-xs text-gray-500 mt-0.5">findings</p>
-                </div>
-                <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 text-center shadow-sm">
-                  <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Swagger</p>
-                  <p class="text-3xl font-bold" :class="scan.api_results.swagger_found ? 'text-green-600 dark:text-green-400' : 'text-gray-400'"
-                     x-text="scan.api_results.swagger_found ? '✓' : '—'"></p>
-                  <p class="text-xs text-gray-500 mt-0.5">spec trouvée</p>
-                </div>
-                <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 text-center shadow-sm">
-                  <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">GraphQL</p>
-                  <p class="text-3xl font-bold" :class="scan.api_results.graphql_found ? 'text-amber-600 dark:text-amber-400' : 'text-gray-400'"
-                     x-text="scan.api_results.graphql_found ? '⚠' : '—'"></p>
-                  <p class="text-xs text-gray-500 mt-0.5">détecté</p>
-                </div>
-              </div>
-
-              <!-- OWASP coverage badges -->
-              <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm mb-4">
-                <p class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Couverture OWASP API Top 10</p>
-                <div class="flex flex-wrap gap-2">
-                  <template x-for="cat in (scan.api_results.owasp_coverage || [])" :key="cat">
-                    <span class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300" x-text="cat"></span>
-                  </template>
-                  <span x-show="!(scan.api_results.owasp_coverage?.length)" class="text-sm text-gray-400">Aucune vulnérabilité détectée</span>
-                </div>
-              </div>
-
-              <!-- Endpoints table -->
-              <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm overflow-hidden"
-                   x-data="{ epSearch: '' }">
-                <div class="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
-                  <p class="font-semibold text-gray-900 dark:text-white text-sm">Endpoints découverts</p>
-                  <input x-model="epSearch" placeholder="Filtrer..." type="text"
-                         class="rounded-lg px-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-orange-500 w-48" />
-                </div>
-                <div class="overflow-x-auto">
-                  <table class="w-full text-sm">
-                    <thead>
-                      <tr class="bg-gray-50 dark:bg-gray-800 text-left">
-                        <th class="px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Méthode</th>
-                        <th class="px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Endpoint</th>
-                        <th class="px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Statut</th>
-                        <th class="px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Taille</th>
-                        <th class="px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Latence</th>
-                      </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                      <template x-for="ep in (scan.api_results.endpoints_found || []).filter(e => !epSearch || e.path?.includes(epSearch))" :key="ep.path">
-                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                          <td class="px-4 py-2.5">
-                            <span class="px-1.5 py-0.5 rounded text-xs font-mono font-bold bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300">GET</span>
-                          </td>
-                          <td class="px-4 py-2.5 font-mono text-xs text-gray-900 dark:text-white" x-text="ep.path"></td>
-                          <td class="px-4 py-2.5">
-                            <span class="px-2 py-0.5 rounded-full text-xs font-bold"
-                                  :class="{
-                                    'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300': ep.status_code < 300,
-                                    'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300': ep.status_code >= 300 && ep.status_code < 400,
-                                    'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300': ep.status_code >= 400,
-                                  }"
-                                  x-text="ep.status_code"></span>
-                          </td>
-                          <td class="px-4 py-2.5 text-xs text-gray-500" x-text="ep.response_size ? (ep.response_size > 1024 ? (ep.response_size/1024).toFixed(1)+'KB' : ep.response_size+'B') : '—'"></td>
-                          <td class="px-4 py-2.5 text-xs text-gray-500" x-text="ep.response_time_ms ? ep.response_time_ms+'ms' : '—'"></td>
-                        </tr>
-                      </template>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          </template>
-          <div x-show="!scan.api_results"
-               class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-12 text-center text-gray-500 shadow-sm">
-            Données API Security non disponibles pour ce type de scan.
-          </div>
-        </div>
-
-        <!-- ===== TAB: OSINT RECON ===== -->
-        <div x-show="activeTab === 'osint'" x-cloak class="mt-4 space-y-4">
-          <template x-if="scan.osint_results">
-            <div class="space-y-4">
-
-              <!-- Summary grid -->
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <!-- WHOIS -->
-                <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
-                  <p class="text-xs font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wider mb-3">WHOIS / Domaine</p>
-                  <dl class="space-y-1.5 text-sm">
-                    <div class="flex justify-between gap-2">
-                      <dt class="text-gray-500">Registrar</dt>
-                      <dd class="font-medium text-gray-900 dark:text-white text-right truncate max-w-[160px]" x-text="scan.osint_results.whois?.registrar || '—'"></dd>
-                    </div>
-                    <div class="flex justify-between gap-2">
-                      <dt class="text-gray-500">Créé</dt>
-                      <dd class="font-medium text-gray-900 dark:text-white" x-text="(scan.osint_results.whois?.created || '—').slice(0,10)"></dd>
-                    </div>
-                    <div class="flex justify-between gap-2">
-                      <dt class="text-gray-500">Expire</dt>
-                      <dd class="font-medium text-gray-900 dark:text-white" x-text="(scan.osint_results.whois?.expires || '—').slice(0,10)"></dd>
-                    </div>
-                    <div class="flex justify-between gap-2">
-                      <dt class="text-gray-500">Org</dt>
-                      <dd class="font-medium text-gray-900 dark:text-white text-right truncate max-w-[160px]" x-text="scan.osint_results.whois?.registrant_org || '—'"></dd>
-                    </div>
-                  </dl>
-                </div>
-
-                <!-- SSL Cert -->
-                <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
-                  <p class="text-xs font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wider mb-3">Certificat SSL/TLS</p>
-                  <dl class="space-y-1.5 text-sm">
-                    <div class="flex justify-between gap-2">
-                      <dt class="text-gray-500">Sujet</dt>
-                      <dd class="font-medium text-gray-900 dark:text-white text-right truncate max-w-[160px]" x-text="scan.osint_results.ssl_cert?.subject || '—'"></dd>
-                    </div>
-                    <div class="flex justify-between gap-2">
-                      <dt class="text-gray-500">Émetteur</dt>
-                      <dd class="font-medium text-gray-900 dark:text-white text-right truncate max-w-[160px]" x-text="scan.osint_results.ssl_cert?.issuer || '—'"></dd>
-                    </div>
-                    <div class="flex justify-between gap-2">
-                      <dt class="text-gray-500">Expire dans</dt>
-                      <dd class="font-bold"
-                          :class="{
-                            'text-red-500': scan.osint_results.ssl_cert?.days_remaining <= 30,
-                            'text-amber-500': scan.osint_results.ssl_cert?.days_remaining > 30 && scan.osint_results.ssl_cert?.days_remaining <= 90,
-                            'text-green-500': scan.osint_results.ssl_cert?.days_remaining > 90
-                          }"
-                          x-text="scan.osint_results.ssl_cert?.days_remaining != null ? scan.osint_results.ssl_cert.days_remaining + ' jours' : '—'"></dd>
-                    </div>
-                    <div class="flex justify-between gap-2">
-                      <dt class="text-gray-500">Auto-signé</dt>
-                      <dd class="font-bold" :class="scan.osint_results.ssl_cert?.is_self_signed ? 'text-red-500' : 'text-green-500'"
-                          x-text="scan.osint_results.ssl_cert?.is_self_signed != null ? (scan.osint_results.ssl_cert.is_self_signed ? 'Oui ⚠' : 'Non ✓') : '—'"></dd>
-                    </div>
-                  </dl>
-                </div>
-
-                <!-- IP / ASN / Geo -->
-                <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
-                  <p class="text-xs font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wider mb-3">Infrastructure</p>
-                  <dl class="space-y-1.5 text-sm">
-                    <div class="flex justify-between gap-2">
-                      <dt class="text-gray-500">IPs</dt>
-                      <dd class="font-mono text-xs text-gray-900 dark:text-white text-right" x-text="(scan.osint_results.ip_addresses || []).join(', ') || '—'"></dd>
-                    </div>
-                    <div class="flex justify-between gap-2">
-                      <dt class="text-gray-500">ASN</dt>
-                      <dd class="font-medium text-gray-900 dark:text-white" x-text="scan.osint_results.asn_info?.asn || '—'"></dd>
-                    </div>
-                    <div class="flex justify-between gap-2">
-                      <dt class="text-gray-500">Organisation</dt>
-                      <dd class="font-medium text-gray-900 dark:text-white text-right truncate max-w-[160px]" x-text="scan.osint_results.asn_info?.org || '—'"></dd>
-                    </div>
-                    <div class="flex justify-between gap-2">
-                      <dt class="text-gray-500">Pays</dt>
-                      <dd class="font-medium text-gray-900 dark:text-white" x-text="scan.osint_results.asn_info?.country || scan.osint_results.geo_info?.country || '—'"></dd>
-                    </div>
-                  </dl>
-                </div>
-              </div>
-
-              <!-- DNS Records -->
-              <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
-                <p class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Enregistrements DNS</p>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <template x-for="rtype in ['A','AAAA','MX','NS','TXT','CNAME']" :key="rtype">
-                    <div x-show="(scan.osint_results.dns_records?.[rtype] || []).length > 0">
-                      <p class="text-xs font-bold text-gray-400 mb-1 uppercase" x-text="rtype"></p>
-                      <template x-for="val in (scan.osint_results.dns_records?.[rtype] || [])" :key="val">
-                        <p class="font-mono text-xs text-gray-700 dark:text-gray-300 truncate" x-text="val"></p>
-                      </template>
-                    </div>
-                  </template>
-                </div>
-              </div>
-
-              <!-- Technologies + Emails row -->
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <!-- Technologies -->
-                <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
-                  <p class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Technologies détectées</p>
-                  <div x-show="scan.osint_results.technologies?.server || scan.osint_results.technologies?.powered_by || scan.osint_results.technologies?.cms" class="space-y-1.5 text-sm mb-3">
-                    <div class="flex justify-between" x-show="scan.osint_results.technologies?.server">
-                      <span class="text-gray-500">Serveur</span>
-                      <span class="font-mono text-xs text-gray-900 dark:text-white" x-text="scan.osint_results.technologies?.server"></span>
-                    </div>
-                    <div class="flex justify-between" x-show="scan.osint_results.technologies?.powered_by">
-                      <span class="text-gray-500">X-Powered-By</span>
-                      <span class="font-mono text-xs text-gray-900 dark:text-white" x-text="scan.osint_results.technologies?.powered_by"></span>
-                    </div>
-                    <div class="flex justify-between" x-show="scan.osint_results.technologies?.cms">
-                      <span class="text-gray-500">CMS</span>
-                      <span class="font-semibold text-gray-900 dark:text-white" x-text="scan.osint_results.technologies?.cms"></span>
-                    </div>
-                  </div>
-                  <div class="flex flex-wrap gap-1.5">
-                    <template x-for="fw in (scan.osint_results.technologies?.frameworks || [])" :key="fw">
-                      <span class="px-2 py-0.5 rounded-md text-xs font-semibold bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300" x-text="fw"></span>
-                    </template>
-                  </div>
-                  <p x-show="!(scan.osint_results.technologies?.frameworks?.length) && !scan.osint_results.technologies?.server"
-                     class="text-sm text-gray-400">Aucune technologie détectée</p>
-                </div>
-
-                <!-- Emails -->
-                <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
-                  <p class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-                    Emails trouvés
-                    <span x-show="scan.osint_results.emails_found?.length"
-                          class="ml-1 px-1.5 py-0.5 rounded-full text-xs font-bold bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
-                          x-text="scan.osint_results.emails_found.length"></span>
-                  </p>
-                  <div class="space-y-1 max-h-40 overflow-y-auto">
-                    <template x-for="email in (scan.osint_results.emails_found || [])" :key="email">
-                      <p class="font-mono text-xs text-gray-700 dark:text-gray-300 py-0.5" x-text="email"></p>
-                    </template>
-                  </div>
-                  <p x-show="!scan.osint_results.emails_found?.length" class="text-sm text-gray-400">Aucun email trouvé publiquement</p>
-                </div>
-              </div>
-
-              <!-- Breach + GitHub row -->
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div class="rounded-2xl p-5 border shadow-sm"
-                     :class="scan.osint_results.breach_data?.breaches_found > 0
-                       ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-                       : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'">
-                  <p class="text-xs font-bold uppercase tracking-wider mb-2"
-                     :class="scan.osint_results.breach_data?.breaches_found > 0 ? 'text-red-500' : 'text-green-500'">
-                    Data Breaches
-                  </p>
-                  <p class="text-3xl font-bold text-gray-900 dark:text-white mb-1" x-text="scan.osint_results.breach_data?.breaches_found ?? 0"></p>
-                  <div class="flex flex-wrap gap-1 mt-2">
-                    <template x-for="b in (scan.osint_results.breach_data?.breach_names || [])" :key="b">
-                      <span class="px-2 py-0.5 rounded text-xs font-semibold bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300" x-text="b"></span>
-                    </template>
-                  </div>
-                </div>
-
-                <div class="rounded-2xl p-5 border shadow-sm"
-                     :class="scan.osint_results.github_exposure?.leaks_found > 0
-                       ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
-                       : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800'">
-                  <p class="text-xs font-bold uppercase tracking-wider mb-2"
-                     :class="scan.osint_results.github_exposure?.leaks_found > 0 ? 'text-amber-600' : 'text-gray-500'">
-                    GitHub Exposure
-                  </p>
-                  <p class="text-3xl font-bold text-gray-900 dark:text-white mb-1" x-text="'~' + (scan.osint_results.github_exposure?.leaks_found ?? 0)"></p>
-                  <p class="text-xs text-gray-500">résultats contenant le domaine + mots-clés sensibles</p>
-                  <div class="flex flex-wrap gap-1 mt-2">
-                    <template x-for="repo in (scan.osint_results.github_exposure?.sample_repos || [])" :key="repo">
-                      <span class="px-2 py-0.5 rounded text-xs font-mono text-amber-700 dark:text-amber-300" x-text="repo"></span>
-                    </template>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Open Ports -->
-              <div x-show="scan.osint_results.open_ports?.length > 0"
-                   class="bg-white dark:bg-gray-900 border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/10 rounded-2xl p-5 shadow-sm">
-                <p class="text-sm font-semibold text-red-600 dark:text-red-400 mb-3">Ports ouverts détectés</p>
-                <div class="flex flex-wrap gap-2">
-                  <template x-for="port in (scan.osint_results.open_ports || [])" :key="port">
-                    <span class="px-3 py-1.5 rounded-xl text-sm font-mono font-bold bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300" x-text="port"></span>
-                  </template>
-                </div>
-              </div>
-
-              <!-- Recommended Dorks -->
-              <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
-                <p class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Google Dorks recommandés</p>
-                <div class="space-y-1.5">
-                  <template x-for="dork in (scan.osint_results.recommended_dorks || [])" :key="dork">
-                    <p class="font-mono text-xs bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 text-gray-700 dark:text-gray-300 break-all" x-text="dork"></p>
-                  </template>
-                </div>
-              </div>
-
-            </div>
-          </template>
-          <div x-show="!scan.osint_results"
-               class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-12 text-center text-gray-500 shadow-sm">
-            Données OSINT non disponibles pour ce type de scan.
-          </div>
-        </div>
-
-        <!-- ===== TAB: REMÉDIATION ===== -->
-        <div x-show="activeTab === 'remediation'" class="mt-4">
-          <div x-show="!scan.attack_paths?.top_priorities?.length" x-cloak
-               class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-12 text-center text-gray-500 shadow-sm">
-            Aucune priorité de remédiation définie.
-          </div>
-
-          <div x-show="scan.attack_paths?.top_priorities?.length" x-cloak
-               class="space-y-3">
-            <template x-for="p in scan.attack_paths?.top_priorities || []" :key="p.rank">
-              <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm flex gap-4">
-                <!-- Rank -->
-                <div class="w-9 h-9 rounded-xl bg-orange-100 dark:bg-orange-900/30
-                            border border-orange-200 dark:border-orange-800
-                            flex items-center justify-center
-                            text-orange-600 dark:text-orange-400
-                            text-sm font-bold flex-shrink-0"
-                     x-text="p.rank"></div>
-                <!-- Content -->
-                <div class="flex-1 min-w-0">
-                  <p class="font-semibold text-gray-900 dark:text-white text-sm mb-1" x-text="p.action"></p>
-                  <p class="text-gray-500 dark:text-gray-400 text-sm mb-3" x-text="p.reason"></p>
-                  <div class="flex items-center gap-4">
-                    <span class="inline-flex items-center gap-1.5 text-xs text-gray-500">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-                      </svg>
-                      Effort : <span class="font-medium text-gray-700 dark:text-gray-300" x-text="p.effort"></span>
-                    </span>
-                    <span class="inline-flex items-center gap-1.5 text-xs text-gray-500">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-                      </svg>
-                      Impact : <span class="font-medium text-green-600 dark:text-green-400" x-text="p.impact_if_fixed"></span>
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </template>
-          </div>
-        </div>
-      </div>
+      </template>
     </div>
   </template>
 </div>
@@ -1510,27 +582,68 @@
 
 {% block scripts %}
 <script>
-const SEVERITY = {
-  critical: { label: 'Critique', card: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800',      text: 'text-red-500 dark:text-red-400',    badge: 'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800' },
-  high:     { label: 'Élevé',   card: 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800', text: 'text-orange-500 dark:text-orange-400', badge: 'bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800' },
-  medium:   { label: 'Moyen',   card: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800',  text: 'text-amber-500 dark:text-amber-400',  badge: 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800' },
-  low:      { label: 'Faible',  card: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800',    text: 'text-blue-500 dark:text-blue-400',    badge: 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800' },
-  info:     { label: 'Info',    card: 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700',    text: 'text-gray-500 dark:text-gray-400',    badge: 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700' },
-};
+const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+const SEV_LABEL = { critical: 'Critique', high: 'Élevée', medium: 'Moyenne', low: 'Faible', info: 'Info' };
 
 function scanDetailApp(scanId) {
   return {
-    scan: null, loading: true, _interval: null,
+    scan: null, loading: true,
     activeTab: 'overview',
+    SEVS: ['critical', 'high', 'medium', 'low', 'info'],
+    sevFilter: '', vulnQuery: '',
+    subFilter: '', subQuery: '',
+    epQuery: '',
+    fwIndex: 0,
     now: Date.now(),
 
+    get ai()     { return this.scan?.attack_paths || {}; },
+    get ti()     { return this.scan?.threat_intel || null; },
+    get sub()    { return this.scan?.subdomain_results || null; },
+    get api()    { return this.scan?.api_results || null; },
+    get osint()  { return this.scan?.osint_results || null; },
+
+    get tabs() {
+      const s = this.scan; if (!s) return [];
+      const t = s.scan_type;
+      const tabs = [{ key: 'overview', label: 'Aperçu', count: null }];
+      if (t === 'cti') tabs.push({ key: 'threat_intel', label: 'Threat Intel', count: null });
+      if (t === 'subdomain') tabs.push({ key: 'subdomains', label: 'Sous-domaines', count: this.sub?.total_found ?? null });
+      if (t === 'api') tabs.push({ key: 'api', label: 'Endpoints', count: this.api?.total_endpoints ?? null });
+      if (t === 'osint') tabs.push({ key: 'osint', label: 'OSINT', count: null });
+      tabs.push({ key: 'vulns', label: 'Vulnérabilités', count: s.vulnerabilities?.length ?? 0 });
+      if (s.compliance_reports && ['web', 'network', 'authenticated_web'].includes(t)) tabs.push({ key: 'compliance', label: 'Conformité', count: null });
+      if (t !== 'cti' && t !== 'osint') {
+        tabs.push({ key: 'attacks', label: "Chemins d'attaque", count: this.ai.attack_paths?.length ?? 0 });
+        tabs.push({ key: 'remediation', label: 'Remédiation', count: this.ai.top_priorities?.length ?? 0 });
+      }
+      return tabs;
+    },
+
+    get sortedVulns() {
+      return [...(this.scan?.vulnerabilities || [])].sort((a, b) =>
+        (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9) || (b.cvss_score || 0) - (a.cvss_score || 0));
+    },
+    get visibleVulns() {
+      const q = this.vulnQuery.trim().toLowerCase();
+      return this.sortedVulns.filter(v =>
+        (!this.sevFilter || v.severity === this.sevFilter) &&
+        (!q || (v.title + ' ' + (v.category || '')).toLowerCase().includes(q)));
+    },
+    get takeovers() { return (this.sub?.subdomains || []).filter(s => s.takeover_risk); },
+    get visibleSubs() {
+      const q = this.subQuery.trim().toLowerCase();
+      return (this.sub?.subdomains || []).filter(s =>
+        (!q || s.subdomain.toLowerCase().includes(q)) &&
+        (this.subFilter !== 'active' || s.status_code != null) &&
+        (this.subFilter !== 'takeover' || s.takeover_risk));
+    },
     // Vérifications effectuées par chaque scanner (liste informative, pas une progression)
     get scanSteps() {
       const steps = {
         web: ['HTTPS et certificat TLS', 'En-têtes de sécurité', 'Cookies et CORS', 'Fichiers sensibles exposés',
-              'Méthodes HTTP autorisées', 'Injections SQL et XSS (paramètres d\'URL)', 'Redirections ouvertes', 'Limitation de débit'],
+              'Méthodes HTTP autorisées', "Injections SQL et XSS (paramètres d'URL)", 'Redirections ouvertes', 'Limitation de débit'],
         authenticated_web: ['Connexion avec le compte fourni', 'Sécurité de la session et des en-têtes', 'Robustesse du JWT',
-              'Contrôle d\'accès et IDOR', 'Protection CSRF', 'Exposition de données sensibles',
+              "Contrôle d'accès et IDOR", 'Protection CSRF', 'Exposition de données sensibles',
               'Mass assignment', 'Injection SQL et limitation de débit sur la connexion'],
         api: ['Découverte des endpoints et de la doc (Swagger/OpenAPI)', 'Audit de chaque endpoint', 'Politique CORS',
               'Limitation de débit', 'GraphQL', 'En-têtes de sécurité et méthodes HTTP'],
@@ -1538,70 +651,33 @@ function scanDetailApp(scanId) {
                   'Services à risque (bases de données, Docker, Redis…)'],
         subdomain: ['Énumération des sous-domaines', 'Résolution DNS', 'Détection des risques de prise de contrôle'],
         osint: ['Enregistrements DNS publics', 'Informations exposées dans les sources publiques'],
-        cti: ['Réputation du domaine ou de l\'IP', 'Présence dans les listes de menaces connues'],
+        cti: ["Réputation du domaine ou de l'IP", 'Présence dans les listes de menaces connues'],
       };
       return [...(steps[this.scan?.scan_type] || []), 'Synthèse IA et score de risque'];
     },
-
     get elapsedLabel() {
-      if (!this.scan?.created_at) return '';
-      // Dates API en UTC sans fuseau : on force l'interprétation UTC
-      const raw = this.scan.created_at;
-      const start = new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(raw) ? raw : raw + 'Z').getTime();
-      const s = Math.max(0, Math.floor((this.now - start) / 1000));
+      const start = ssDate(this.scan?.created_at);
+      if (!start) return '';
+      const s = Math.max(0, Math.floor((this.now - start.getTime()) / 1000));
       const m = Math.floor(s / 60);
       return m ? `${m} min ${String(s % 60).padStart(2, '0')} s écoulées` : `${s} s écoulées`;
     },
-
-    get tabs() {
-      const base = [
-        { key: 'overview', label: 'Aperçu', count: null },
-        { key: 'vulns',    label: 'Vulnérabilités', count: this.scan?.vulnerabilities?.length ?? 0 },
-      ];
-      if (this.scan?.scan_type === 'cti') {
-        base.push({ key: 'threat_intel', label: 'Threat Intel', count: null });
-      }
-      if (this.scan?.scan_type === 'subdomain') {
-        base.push({
-          key: 'subdomains',
-          label: 'Sous-domaines',
-          count: this.scan?.subdomain_results?.total_found ?? null,
-        });
-      }
-      if (this.scan?.scan_type === 'api') {
-        base.push({
-          key: 'api',
-          label: 'API Endpoints',
-          count: this.scan?.api_results?.total_endpoints ?? null,
-        });
-      }
-      if (this.scan?.scan_type === 'osint') {
-        base.push({ key: 'osint', label: 'OSINT Intel', count: null });
-      }
-      if (this.scan?.scan_type !== 'cti' && this.scan?.scan_type !== 'subdomain'
-          && this.scan?.scan_type !== 'api' && this.scan?.scan_type !== 'osint'
-          && this.scan?.compliance_reports) {
-        base.push({ key: 'compliance', label: 'Conformité', count: null });
-      }
-      if (this.scan?.scan_type !== 'cti' && this.scan?.scan_type !== 'osint') {
-        base.push(
-          { key: 'attacks',     label: 'Chemins d\'attaque', count: this.scan?.attack_paths?.attack_paths?.length ?? 0 },
-          { key: 'remediation', label: 'Remédiation',         count: this.scan?.attack_paths?.top_priorities?.length ?? 0 },
-        );
-      }
-      return base;
+    get duration() {
+      if (!this.scan?.completed_at) return '';
+      const sec = Math.max(0, Math.round((ssDate(this.scan.completed_at) - ssDate(this.scan.created_at)) / 1000));
+      return sec < 60 ? sec + ' s' : Math.floor(sec / 60) + ' min ' + String(sec % 60).padStart(2, '0') + ' s';
     },
 
     async init() {
+      const hash = window.location.hash.slice(1);
       await this.fetchScan();
+      if (hash && this.tabs.some(t => t.key === hash)) this.activeTab = hash;
+      setInterval(() => {
+        if (this.scan?.status === 'running' || this.scan?.status === 'pending') this.fetchScan();
+      }, 3000);
       setInterval(() => {
         if (this.scan?.status === 'running' || this.scan?.status === 'pending') this.now = Date.now();
       }, 1000);
-      this._interval = setInterval(() => {
-        if (this.scan?.status === 'running' || this.scan?.status === 'pending') {
-          this.fetchScan();
-        }
-      }, 3000);
     },
 
     async fetchScan() {
@@ -1613,29 +689,31 @@ function scanDetailApp(scanId) {
       }
     },
 
-    countBySeverity(sev) {
-      return this.scan?.vulnerabilities?.filter(v => v.severity === sev).length || 0;
+    setTab(key) {
+      this.activeTab = key;
+      history.replaceState(null, '', '#' + key);
     },
-    severityLabel(sev) { return SEVERITY[sev]?.label || sev; },
-    severityCard(sev)  { return SEVERITY[sev]?.card  || ''; },
-    severityText(sev)  { return SEVERITY[sev]?.text  || ''; },
-    severityBadge(sev) { return SEVERITY[sev]?.badge || SEVERITY.info.badge; },
 
-    async openReport() {
-      // Onglet ouvert tout de suite (dans le geste utilisateur, sinon bloqué comme popup),
-      // puis redirigé vers un lien à portée limitée : le token de session ne quitte jamais la page.
-      const win = window.open('', '_blank');
-      try {
-        const res = await apiFetch(`/scans/${scanId}/report-link`, { method: 'POST' });
-        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || 'Rapport indisponible');
-        const { url } = await res.json();
-        if (win) win.location.href = url; else window.location.href = url;
-      } catch (e) {
-        if (win) win.close();
-        alert(e.message || "Impossible d'ouvrir le rapport.");
-      }
-    }
-  }
+    count(sev) { return this.scan?.vulnerabilities?.filter(v => v.severity === sev).length || 0; },
+    sevLabel(s) { return SEV_LABEL[s] || s; },
+    icon(t) { return SS_ICON[t] || ''; },
+    typeLabel(t) { return SS_TYPE_LABEL[t] || t; },
+    statusLabel(s) { return { pending: 'En attente', running: 'En cours', completed: 'Terminé', failed: 'Échec' }[s] || s; },
+    statusDot(s) { return { pending: 'pending', running: 'run', completed: 'ok', failed: 'fail' }[s] || ''; },
+    fmtDate(d) { return ssDate(d).toLocaleString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }); },
+    riskCls(r) { return r == null ? 'muted' : r >= 7 ? 'c-critical' : r >= 5 ? 'c-high' : r >= 3 ? 'c-medium' : 'c-ok'; },
+    riskBar(r) { return r == null ? '' : r >= 7 ? 'critical' : r >= 5 ? 'high' : r >= 3 ? 'medium' : 'ok'; },
+    riskLabel(r) { return r >= 7 ? 'Élevé' : r >= 4 ? 'Modéré' : 'Faible'; },
+    scoreBar(v) { return v >= 60 ? 'ok' : v >= 40 ? 'medium' : 'critical'; },
+    tiCls(l) { return { critical: 'c-critical', high: 'c-high', medium: 'c-medium', low: 'c-ok' }[l] || ''; },
+    sslCls(d) { return d == null ? '' : d <= 30 ? 'c-critical' : d <= 90 ? 'c-medium' : ''; },
+    ctrlCls(s) { return { pass: 'ok', fail: 'fail', partial: 'warn' }[s] || ''; },
+    ctrlLabel(s) { return { pass: 'Conforme', fail: 'Non conforme', partial: 'Partiel', na: 'N/A' }[s] || s; },
+    httpCls(c) { return c == null ? '' : c < 300 ? 'ok' : c < 400 ? '' : 'warn'; },
+    srcLabel(s) { return { 'crt.sh': 'crt.sh', crtsh: 'crt.sh', hackertarget: 'HackerTarget', bruteforce: 'Brute-force', dns_records: 'DNS', zone_transfer: 'Zone transfer' }[s] || s || '—'; },
+
+    openReport() { ssOpenReport(scanId); },
+  };
 }
 </script>
 {% endblock %}
