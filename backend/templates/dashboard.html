@@ -1,748 +1,357 @@
 {% extends "base_app.html" %}
-{% block title %}Dashboard - SuturaSec{% endblock %}
-{% block page_title %}Tableau de bord{% endblock %}
-{% block page_subtitle %}Vue d'ensemble de vos analyses de sécurité{% endblock %}
-
-{% block header_actions %}
-<button @click="showForm = true; newScan.scan_type = 'web'"
-        class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white
-               px-4 py-2 rounded-xl text-sm font-semibold
-               shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40
-               transition-all duration-150">
-  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-  </svg>
-  Nouveau scan
-</button>
-{% endblock %}
+{% block title %}Tableau de bord · SuturaSec{% endblock %}
 
 {% block content %}
-<div x-data="dashboardApp()" x-init="init()">
+<div class="stack" style="gap:28px" x-data="dashboardApp()" x-init="init()">
 
-  <!-- ===== STATS GRID ===== -->
-  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
-
-    <!-- Total -->
-    <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
-      <div class="flex items-center justify-between mb-3">
-        <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total scans</p>
-        <div class="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-500 dark:text-gray-400">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          </svg>
-        </div>
-      </div>
-      <p class="text-3xl font-bold text-gray-900 dark:text-white" x-text="scans.length"></p>
-      <p class="text-xs text-gray-400 mt-1">analyses lancées</p>
+  <header class="page-head">
+    <div>
+      <h1>Tableau de bord</h1>
+      <p>Vue d'ensemble de vos analyses de sécurité.</p>
     </div>
+    <button class="btn btn-primary" type="button" @click="openForm('web')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      Nouvelle analyse
+    </button>
+  </header>
 
-    <!-- Running -->
-    <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
-      <div class="flex items-center justify-between mb-3">
-        <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">En cours</p>
-        <div class="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-500 dark:text-indigo-400">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
-            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-          </svg>
-        </div>
-      </div>
-      <p class="text-3xl font-bold text-indigo-600 dark:text-indigo-400"
-         x-text="scans.filter(s => s.status === 'running' || s.status === 'pending').length"></p>
-      <p class="text-xs text-gray-400 mt-1">en exécution</p>
-    </div>
+  <!-- Indicateurs -->
+  <section class="stats" aria-label="Indicateurs">
+    <div class="stat"><p>Analyses</p><strong x-text="scans.length"></strong><small>lancées au total</small></div>
+    <div class="stat"><p>En cours</p><strong x-text="scans.filter(s => s.status === 'running' || s.status === 'pending').length"></strong><small>en exécution</small></div>
+    <div class="stat"><p>Vulnérabilités</p><strong x-text="sum('vuln_count')"></strong><small>sur les analyses terminées</small></div>
+    <div class="stat"><p>Critiques</p><strong :class="sum('critical_count') > 0 && 'c-critical'" x-text="sum('critical_count')"></strong><small>à corriger en priorité</small></div>
+  </section>
 
-    <!-- Completed -->
-    <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
-      <div class="flex items-center justify-between mb-3">
-        <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Terminés</p>
-        <div class="w-8 h-8 rounded-lg bg-green-50 dark:bg-green-900/20 flex items-center justify-center text-green-500 dark:text-green-400">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="20 6 9 17 4 12"/>
-          </svg>
-        </div>
-      </div>
-      <p class="text-3xl font-bold text-green-600 dark:text-green-400"
-         x-text="scans.filter(s => s.status === 'completed').length"></p>
-      <p class="text-xs text-gray-400 mt-1">complétés</p>
-    </div>
-
-    <!-- Critiques -->
-    <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
-      <div class="flex items-center justify-between mb-3">
-        <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Critiques</p>
-        <div class="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-900/20 flex items-center justify-center text-red-500 dark:text-red-400">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-          </svg>
-        </div>
-      </div>
-      <p class="text-3xl font-bold text-red-600 dark:text-red-400"
-         x-text="scans.reduce((a, s) => a + (s.critical_count || 0), 0)"></p>
-      <p class="text-xs text-gray-400 mt-1">vulnérabilités critiques</p>
-    </div>
-  </div>
-
-  <!-- ===== CHARTS ROW ===== -->
-  <div x-show="completedScans.length > 0" x-cloak class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
-
-    <!-- Bar chart : Scores de risque -->
-    <div class="lg:col-span-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
-      <div class="flex items-center justify-between mb-4">
-        <div>
-          <p class="text-sm font-semibold text-gray-900 dark:text-white">Scores de risque</p>
-          <p class="text-xs text-gray-500 mt-0.5">Derniers scans complétés</p>
-        </div>
-        <div class="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center">
-          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2">
-            <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
-            <line x1="6" y1="20" x2="6" y2="14"/>
-          </svg>
-        </div>
-      </div>
-      <div class="relative h-48">
-        <canvas id="riskChart"></canvas>
-      </div>
-    </div>
-
-    <!-- Donut : Répartition sévérités -->
-    <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
-      <div class="flex items-center justify-between mb-4">
-        <div>
-          <p class="text-sm font-semibold text-gray-900 dark:text-white">Vulnérabilités</p>
-          <p class="text-xs text-gray-500 mt-0.5">Par sévérité</p>
-        </div>
-        <div class="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center">
-          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/>
-          </svg>
-        </div>
-      </div>
-      <div class="relative h-36 flex items-center justify-center">
-        <canvas id="sevChart"></canvas>
-      </div>
-      <!-- Legend -->
-      <div class="grid grid-cols-2 gap-1.5 mt-3">
-        <template x-for="[label, color, key] in [
-          ['Critique','bg-red-500','critical_count'],
-          ['Élevé','bg-orange-500','high_count'],
-          ['Moyen','bg-amber-500','medium_count'],
-          ['Faible','bg-blue-400','low_count']
-        ]" :key="label">
-          <div class="flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full flex-shrink-0" :class="color"></span>
-            <span class="text-xs text-gray-500 dark:text-gray-400" x-text="label + ': ' + scans.reduce((a,s)=>a+(s[key]||0),0)"></span>
+  <!-- Répartition + scores -->
+  <div class="grid-2" x-show="completedScans.length > 0" x-cloak>
+    <section class="card" aria-labelledby="bysev">
+      <div class="card-head"><h2 id="bysev">Par sévérité</h2><p>Analyses terminées</p></div>
+      <div class="card-body sev-rows">
+        <template x-for="s in sevRows" :key="s.key">
+          <div class="sev-row">
+            <span class="sev" :class="s.key" x-text="s.label"></span>
+            <div class="bar" :class="s.key"><span :style="`width:${s.pct}%`"></span></div>
+            <span class="r num" x-text="s.n"></span>
           </div>
         </template>
       </div>
-    </div>
+    </section>
+
+    <section class="card" aria-labelledby="risk">
+      <div class="card-head"><h2 id="risk">Scores de risque</h2><p>10 dernières analyses</p></div>
+      <div class="card-body score-bars">
+        <template x-for="s in riskRows" :key="s.id">
+          <a class="score-bar" :href="'/scans/' + s.id" style="color:inherit">
+            <span class="name" x-text="s.label" :title="s.target"></span>
+            <div class="bar" :class="s.cls"><span :style="`width:${s.risk_score * 10}%`"></span></div>
+            <b class="r num" :class="'c-' + s.cls" style="font-weight:500" x-text="s.risk_score.toFixed(1)"></b>
+          </a>
+        </template>
+        <p class="small muted" x-show="riskRows.length === 0">Aucun score disponible.</p>
+      </div>
+    </section>
   </div>
 
-  <!-- ===== COMPLIANCE MINI-SCORES ===== -->
-  <div x-show="complianceScans.length > 0" x-cloak
-       class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm mb-5">
-    <div class="flex items-center justify-between mb-4">
-      <div>
-        <p class="text-sm font-semibold text-gray-900 dark:text-white">Conformité — dernier scan</p>
-        <p class="text-xs text-gray-500 mt-0.5" x-text="'Cible : ' + (complianceScans[0]?.target || '—')"></p>
+  <!-- Conformité -->
+  <section class="card" x-show="complianceScan" x-cloak aria-labelledby="comp">
+    <div class="card-head">
+      <div class="stack-sm" style="gap:2px">
+        <h2 id="comp">Conformité</h2>
+        <p class="mono" x-text="'Dernière analyse · ' + (complianceScan?.target || '')"></p>
       </div>
-      <span class="text-lg font-black px-3 py-1 rounded-xl"
-            :class="{
-              'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400': ['A+','A'].includes(complianceScans[0]?.compliance_grade),
-              'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400': complianceScans[0]?.compliance_grade === 'B',
-              'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400': complianceScans[0]?.compliance_grade === 'C',
-              'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400': ['D','F'].includes(complianceScans[0]?.compliance_grade)
-            }"
-            x-text="(complianceScans[0]?.compliance_grade || '—') + '  ' + (complianceScans[0]?.compliance_score?.toFixed(0) || '—') + '/100'">
-      </span>
+      <a class="small" :href="'/scans/' + complianceScan?.id"
+         x-text="'Score ' + (complianceScan?.compliance_score?.toFixed(0) ?? '—') + ' / 100 · note ' + (complianceScan?.compliance_grade || '—')"></a>
     </div>
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-      <template x-for="[label, color] in [['OWASP','indigo'],['PCI-DSS','violet'],['ISO 27001','cyan'],['RGPD','emerald']]" :key="label">
-        <div class="space-y-1.5">
-          <div class="flex justify-between items-center">
-            <span class="text-xs font-semibold text-gray-500 dark:text-gray-400" x-text="label"></span>
-            <span class="text-xs font-bold text-gray-700 dark:text-gray-300"
-                  x-text="(getFrameworkScore(label) || '—') + (getFrameworkScore(label) !== null ? '/100' : '')"></span>
-          </div>
-          <div class="w-full h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-            <div class="h-full rounded-full transition-all duration-500"
-                 :style="`width: ${getFrameworkScore(label) || 0}%`"
-                 :class="{
-                   'bg-green-500': getFrameworkScore(label) >= 80,
-                   'bg-amber-500': getFrameworkScore(label) >= 60 && getFrameworkScore(label) < 80,
-                   'bg-orange-500': getFrameworkScore(label) >= 40 && getFrameworkScore(label) < 60,
-                   'bg-red-500': getFrameworkScore(label) < 40 && getFrameworkScore(label) !== null
-                 }"></div>
-          </div>
+    <div class="card-body grid-2" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+      <template x-for="fw in frameworkRows" :key="fw.label">
+        <div class="stack-sm" style="gap:6px">
+          <div class="row between small"><span class="t2" x-text="fw.label"></span><b class="num" x-text="fw.score === null ? '—' : fw.score.toFixed(0) + ' %'"></b></div>
+          <div class="bar" :class="fw.cls"><span :style="`width:${fw.score || 0}%`"></span></div>
         </div>
       </template>
     </div>
-  </div>
+  </section>
 
-  <!-- ===== MODAL NOUVEAU SCAN ===== -->
-  <div x-show="showForm" x-cloak
-       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-       @keydown.escape.window="showForm = false">
-    <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800
-                rounded-2xl shadow-2xl w-full max-w-md
-                fade-up">
-      <!-- Modal header -->
-      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
-        <div class="flex items-center gap-2">
-          <div class="w-7 h-7 rounded-lg bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center">
-            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.5">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-          </div>
-          <h2 class="font-semibold text-gray-900 dark:text-white text-sm">Nouveau scan</h2>
-        </div>
-        <button @click="showForm = false; formError = ''"
-                class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
+  <!-- Historique -->
+  <section class="card" aria-labelledby="hist">
+    <div class="card-head">
+      <h2 id="hist">Historique des analyses</h2>
+      <div class="row">
+        <label class="search">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <input type="search" x-model="query" placeholder="Rechercher une cible" aria-label="Rechercher une cible">
+        </label>
+        <label class="sr-only" for="ftype">Filtrer par type</label>
+        <select id="ftype" class="input" x-model="typeFilter" style="min-height:36px;width:auto;padding:0 10px;font-size:13px">
+          <option value="">Tous les types</option>
+          <template x-for="t in types" :key="t.key"><option :value="t.key" x-text="t.label"></option></template>
+        </select>
+        <button class="btn btn-ghost icon-btn" type="button" @click="fetchScans()" aria-label="Actualiser">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="loading" x-show="loading"><span class="spinner" aria-hidden="true"></span>Chargement…</div>
+
+    <div class="empty" x-show="!loading && scans.length === 0" x-cloak>
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/></svg>
+      <h2>Aucune analyse pour l'instant</h2>
+      <p style="max-width:44ch">Lancez une première analyse sur un site, une API, un domaine ou une plage réseau que vous êtes autorisé à tester.</p>
+      <button class="btn btn-primary" type="button" style="margin-top:8px" @click="openForm('web')">Nouvelle analyse</button>
+    </div>
+
+    <div class="table-wrap" x-show="!loading && scans.length > 0" x-cloak>
+      <table style="min-width:760px">
+        <thead>
+          <tr><th>Cible</th><th>Type</th><th>Statut</th><th>Constats</th><th class="r">Risque</th><th class="r">Date</th><th><span class="sr-only">Actions</span></th></tr>
+        </thead>
+        <tbody>
+          <template x-for="scan in filteredScans" :key="scan.id">
+            <tr class="row-link" @click="go(scan.id)">
+              <td><a class="target" :href="'/scans/' + scan.id" @click.stop x-text="scan.target"></a></td>
+              <td><span class="type"><span x-html="icon(scan.scan_type)"></span><span x-text="typeLabel(scan.scan_type)"></span></span></td>
+              <td><span class="status"><span class="dot" :class="statusDot(scan.status)"></span><span x-text="statusLabel(scan.status)"></span></span></td>
+              <td class="num" x-text="findings(scan)"></td>
+              <td class="r num">
+                <b style="font-weight:500" :class="riskCls(scan.risk_score)" x-text="scan.risk_score != null ? scan.risk_score.toFixed(1) : '—'"></b>
+              </td>
+              <td class="r num muted" x-text="fmtDate(scan.created_at)"></td>
+              <td class="r">
+                <button class="btn btn-ghost icon-btn row-actions" type="button" @click.stop="deleteScan(scan.id)" :aria-label="'Supprimer l\'analyse ' + scan.target">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>
+                </button>
+              </td>
+            </tr>
+          </template>
+          <tr x-show="filteredScans.length === 0"><td colspan="7" class="muted" style="text-align:center;padding:32px">Aucune analyse ne correspond à la recherche.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Fenêtre « Nouvelle analyse » -->
+  <div class="backdrop" x-show="showForm" x-cloak @keydown.escape.window="closeForm()" @click.self="closeForm()">
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-title">
+      <div class="dialog-head">
+        <div><h2 id="dlg-title">Nouvelle analyse</h2><p>Choisissez un type d'analyse et une cible.</p></div>
+        <button class="btn btn-ghost icon-btn" type="button" @click="closeForm()" aria-label="Fermer">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
       </div>
 
-      <div class="p-6">
-        <!-- Form error -->
-        <div x-show="formError" x-cloak
-             class="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800
-                    text-red-600 dark:text-red-400 rounded-xl px-4 py-3 text-sm mb-4">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
-          <span x-text="formError"></span>
+      <form @submit.prevent="createScan()">
+        <div class="dialog-body">
+          <div class="alert" role="alert" x-show="formError" x-cloak>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 3l10 18H2L12 3z"/><path d="M12 10v4M12 17.5v.5"/></svg>
+            <span x-text="formError"></span>
+          </div>
+
+          <fieldset>
+            <legend class="label">Type d'analyse</legend>
+            <div class="choice-grid">
+              <template x-for="t in types" :key="t.key">
+                <button type="button" class="choice" :aria-pressed="newScan.scan_type === t.key ? 'true' : 'false'" @click="newScan.scan_type = t.key">
+                  <span x-html="t.icon"></span>
+                  <div><b x-text="t.label"></b><span x-text="t.hint"></span></div>
+                </button>
+              </template>
+            </div>
+          </fieldset>
+
+          <div class="field">
+            <label for="target">Cible</label>
+            <input class="input mono" id="target" type="text" x-model="newScan.target" required x-ref="target"
+                   :placeholder="placeholder" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="target-hint">
+            <span class="hint" id="target-hint">N'analysez que des systèmes que vous possédez ou que vous êtes autorisé à tester.</span>
+          </div>
+
+          <fieldset class="stack" x-show="newScan.scan_type === 'authenticated_web'" x-cloak
+                    style="padding:16px;border:1px solid var(--border);border-radius:var(--radius-sm)">
+            <legend class="label" style="padding:0 6px">Identifiants de connexion</legend>
+            <div class="grid-2" style="gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+              <div class="field"><label for="auth-login">Email ou nom d'utilisateur</label>
+                <input class="input" id="auth-login" x-model="auth.login_identifier" autocomplete="off"></div>
+              <div class="field"><label for="auth-pwd">Mot de passe</label>
+                <input class="input" id="auth-pwd" type="password" x-model="auth.password" autocomplete="new-password"></div>
+            </div>
+            <div class="field"><label for="auth-url">URL de connexion <span class="muted" style="font-weight:400">(optionnel)</span></label>
+              <input class="input mono" id="auth-url" x-model="auth.login_url" placeholder="https://app.example.com/login">
+              <span class="hint">Détectée automatiquement si vide.</span></div>
+            <div class="field"><label for="auth-token">Jeton d'accès <span class="muted" style="font-weight:400">(optionnel)</span></label>
+              <input class="input mono" id="auth-token" x-model="auth.provided_token" placeholder="Bearer eyJhbGciOi…" autocomplete="off">
+              <span class="hint">S'il est renseigné, l'email et le mot de passe sont ignorés.</span></div>
+            <p class="xs muted">Les identifiants servent uniquement pendant l'analyse et ne sont pas enregistrés.</p>
+          </fieldset>
         </div>
 
-        <form @submit.prevent="createScan()" class="space-y-5">
-          <!-- Type selector -->
-          <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Type d'analyse</label>
-            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-              <button type="button" @click="newScan.scan_type = 'web'"
-                      :class="newScan.scan_type === 'web'
-                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
-                        : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800'"
-                      class="flex flex-col items-center gap-2.5 p-4 rounded-xl border-2 transition-all text-sm font-medium">
-                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
-                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-                </svg>
-                Web
-              </button>
-              <button type="button" @click="newScan.scan_type = 'network'"
-                      :class="newScan.scan_type === 'network'
-                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
-                        : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800'"
-                      class="flex flex-col items-center gap-2.5 p-4 rounded-xl border-2 transition-all text-sm font-medium">
-                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/>
-                  <line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
-                </svg>
-                Réseau
-              </button>
-              <button type="button" @click="newScan.scan_type = 'cti'"
-                      :class="newScan.scan_type === 'cti'
-                        ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                        : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800'"
-                      class="flex flex-col items-center gap-2.5 p-4 rounded-xl border-2 transition-all text-sm font-medium">
-                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
-                </svg>
-                Threat Intel
-              </button>
-              <button type="button" @click="newScan.scan_type = 'subdomain'"
-                      :class="newScan.scan_type === 'subdomain'
-                        ? 'border-violet-500 bg-violet-50 dark:bg-violet-500/10 text-violet-600 dark:text-violet-400'
-                        : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800'"
-                      class="flex flex-col items-center gap-2.5 p-4 rounded-xl border-2 transition-all text-sm font-medium">
-                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="3"/><circle cx="4" cy="6" r="2"/><circle cx="20" cy="6" r="2"/>
-                  <circle cx="4" cy="18" r="2"/><circle cx="20" cy="18" r="2"/>
-                  <line x1="6" y1="6" x2="10" y2="11"/><line x1="18" y1="6" x2="14" y2="11"/>
-                  <line x1="6" y1="18" x2="10" y2="13"/><line x1="18" y1="18" x2="14" y2="13"/>
-                </svg>
-                Subdomains
-              </button>
-
-              <!-- API Security -->
-              <button type="button" @click="newScan.scan_type = 'api'"
-                      :class="newScan.scan_type === 'api'
-                        ? 'border-orange-500 bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400'
-                        : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800'"
-                      class="flex flex-col items-center gap-2.5 p-4 rounded-xl border-2 transition-all text-sm font-medium">
-                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
-                </svg>
-                API
-              </button>
-
-              <!-- OSINT -->
-              <button type="button" @click="newScan.scan_type = 'osint'"
-                      :class="newScan.scan_type === 'osint'
-                        ? 'border-cyan-500 bg-cyan-50 dark:bg-cyan-500/10 text-cyan-600 dark:text-cyan-400'
-                        : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800'"
-                      class="flex flex-col items-center gap-2.5 p-4 rounded-xl border-2 transition-all text-sm font-medium">
-                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                  <line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
-                </svg>
-                OSINT
-              </button>
-            </div>
-          </div>
-
-          <!-- Target -->
-          <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Cible à analyser</label>
-            <input type="text" x-model="newScan.target" required
-                   :placeholder="newScan.scan_type === 'web' ? 'https://example.com' : newScan.scan_type === 'network' ? '192.168.1.0/24 ou 192.168.1.1' : newScan.scan_type === 'subdomain' || newScan.scan_type === 'osint' ? 'example.com' : newScan.scan_type === 'api' ? 'https://api.example.com' : 'example.com ou 1.2.3.4'"
-                   class="w-full rounded-xl px-4 py-3 text-sm
-                          bg-gray-50 dark:bg-gray-800
-                          border border-gray-200 dark:border-gray-700
-                          text-gray-900 dark:text-white
-                          placeholder-gray-400 dark:placeholder-gray-500
-                          focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500
-                          transition-colors font-mono" />
-          </div>
-
-          <!-- Actions -->
-          <div class="flex gap-3 pt-1">
-            <button type="button" @click="showForm = false; formError = ''"
-                    class="flex-1 py-2.5 rounded-xl text-sm font-medium
-                           border border-gray-200 dark:border-gray-700
-                           text-gray-600 dark:text-gray-400
-                           hover:bg-gray-50 dark:hover:bg-gray-800
-                           transition-colors">
-              Annuler
-            </button>
-            <button type="submit" :disabled="submitting"
-                    class="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white
-                           bg-indigo-600 hover:bg-indigo-500
-                           disabled:opacity-60 disabled:cursor-not-allowed
-                           shadow-lg shadow-indigo-500/25 transition-all">
-              <span x-text="submitting ? 'Lancement...' : '🚀 Lancer le scan'"></span>
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===== SCAN LIST ===== -->
-  <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm overflow-hidden" id="rapports">
-
-    <!-- List header -->
-    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <h2 class="font-semibold text-gray-900 dark:text-white">Historique des scans</h2>
-        <span class="text-xs bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 px-2 py-0.5 rounded-full font-medium"
-              x-text="scans.length + ' scan' + (scans.length !== 1 ? 's' : '')"></span>
-      </div>
-      <button @click="fetchScans()"
-              class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
-        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
-          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-        </svg>
-      </button>
-    </div>
-
-    <!-- Loading -->
-    <div x-show="loading" class="flex flex-col items-center justify-center py-16 text-gray-400">
-      <svg class="animate-spin mb-3" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/>
-        <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/>
-        <line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>
-        <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/>
-      </svg>
-      Chargement...
-    </div>
-
-    <!-- Empty state -->
-    <div x-show="!loading && scans.length === 0" x-cloak class="flex flex-col items-center justify-center py-16 px-6 text-center">
-      <div class="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
-        <svg class="text-gray-400" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-        </svg>
-      </div>
-      <p class="font-semibold text-gray-900 dark:text-white mb-1">Aucun scan pour l'instant</p>
-      <p class="text-sm text-gray-500 mb-4">Lancez votre première analyse de sécurité</p>
-      <button @click="showForm = true"
-              class="flex items-center gap-2 text-sm font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-        </svg>
-        Nouveau scan
-      </button>
-    </div>
-
-    <!-- Scan items -->
-    <div x-show="!loading && scans.length > 0" x-cloak class="divide-y divide-gray-100 dark:divide-gray-800">
-      <template x-for="scan in scans" :key="scan.id">
-        <div class="flex items-center gap-4 px-6 py-4
-                    hover:bg-gray-50 dark:hover:bg-gray-800/50
-                    transition-colors cursor-pointer group"
-             @click="window.location.href = '/scans/' + scan.id">
-
-          <!-- Type icon -->
-          <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-               :class="{
-                 'bg-blue-50 dark:bg-blue-900/20 text-blue-500 dark:text-blue-400': scan.scan_type === 'web',
-                 'bg-purple-50 dark:bg-purple-900/20 text-purple-500 dark:text-purple-400': scan.scan_type === 'network',
-                 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500 dark:text-emerald-400': scan.scan_type === 'cti',
-                 'bg-violet-50 dark:bg-violet-900/20 text-violet-500 dark:text-violet-400': scan.scan_type === 'subdomain',
-                 'bg-orange-50 dark:bg-orange-900/20 text-orange-500 dark:text-orange-400': scan.scan_type === 'api',
-                 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-500 dark:text-cyan-400': scan.scan_type === 'osint',
-               }">
-            <template x-if="scan.scan_type === 'web'">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
-                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-              </svg>
-            </template>
-            <template x-if="scan.scan_type === 'network'">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/>
-                <line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
-              </svg>
-            </template>
-            <template x-if="scan.scan_type === 'cti'">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
-              </svg>
-            </template>
-            <template x-if="scan.scan_type === 'subdomain'">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="3"/><circle cx="4" cy="6" r="2"/><circle cx="20" cy="6" r="2"/>
-                <circle cx="4" cy="18" r="2"/><circle cx="20" cy="18" r="2"/>
-                <line x1="6" y1="6" x2="10" y2="11"/><line x1="18" y1="6" x2="14" y2="11"/>
-                <line x1="6" y1="18" x2="10" y2="13"/><line x1="18" y1="18" x2="14" y2="13"/>
-              </svg>
-            </template>
-            <template x-if="scan.scan_type === 'api'">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
-              </svg>
-            </template>
-            <template x-if="scan.scan_type === 'osint'">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                <line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
-              </svg>
-            </template>
-          </div>
-
-          <!-- Target + meta -->
-          <div class="flex-1 min-w-0">
-            <p class="text-sm font-semibold text-gray-900 dark:text-white truncate" x-text="scan.target"></p>
-            <p class="text-xs text-gray-500 mt-0.5">
-              <span x-text="{'web':'Web','network':'Réseau','cti':'Threat Intel','subdomain':'Subdomains','api':'API Security','osint':'OSINT'}[scan.scan_type] || scan.scan_type"></span>
-              · <span x-text="new Date(scan.created_at).toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })"></span>
-            </p>
-          </div>
-
-          <!-- Count info -->
-          <div class="hidden sm:flex items-center gap-1 text-xs flex-shrink-0">
-            <template x-if="scan.scan_type === 'subdomain'">
-              <span class="text-gray-400">subdomains: <span class="font-bold text-violet-600 dark:text-violet-400" x-text="scan.subdomain_count ?? '—'"></span></span>
-            </template>
-            <template x-if="scan.scan_type === 'api'">
-              <span class="text-gray-400">endpoints: <span class="font-bold text-orange-600 dark:text-orange-400" x-text="scan.api_endpoint_count ?? '—'"></span></span>
-            </template>
-            <template x-if="scan.scan_type === 'osint'">
-              <span class="text-gray-400">findings: <span class="font-bold text-cyan-600 dark:text-cyan-400" x-text="scan.vuln_count ?? '—'"></span></span>
-            </template>
-            <template x-if="scan.scan_type !== 'subdomain' && scan.scan_type !== 'api' && scan.scan_type !== 'osint'">
-              <span class="text-gray-400">vulns: <span class="font-bold text-gray-700 dark:text-gray-300" x-text="scan.vuln_count || 0"></span></span>
-            </template>
-          </div>
-
-          <!-- Risk score -->
-          <div class="w-14 text-right flex-shrink-0">
-            <span x-show="scan.risk_score != null"
-                  class="inline-flex items-center px-2 py-1 rounded-lg text-xs font-bold"
-                  :class="{
-                    'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400': scan.risk_score >= 7,
-                    'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400': scan.risk_score >= 4 && scan.risk_score < 7,
-                    'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400': scan.risk_score != null && scan.risk_score < 4
-                  }"
-                  x-text="scan.risk_score?.toFixed(1)"></span>
-            <span x-show="scan.risk_score == null" class="text-gray-400 text-xs">—</span>
-          </div>
-
-          <!-- Status badge -->
-          <div class="flex-shrink-0">
-            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
-                  :class="{
-                    'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400': scan.status === 'pending',
-                    'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400': scan.status === 'running',
-                    'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400': scan.status === 'completed',
-                    'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400': scan.status === 'failed'
-                  }">
-              <span x-show="scan.status === 'running'"
-                    class="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
-              <span x-text="{pending:'En attente', running:'En cours', completed:'Terminé', failed:'Échoué'}[scan.status] || scan.status"></span>
-            </span>
-          </div>
-
-          <!-- Delete -->
-          <button @click.stop="deleteScan(scan.id)"
-                  class="text-gray-300 dark:text-gray-700 hover:text-red-500 dark:hover:text-red-400
-                         opacity-0 group-hover:opacity-100 transition-all flex-shrink-0 p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/>
-              <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
-            </svg>
+        <div class="dialog-foot">
+          <button class="btn" type="button" @click="closeForm()">Annuler</button>
+          <button class="btn btn-primary" type="submit" :disabled="submitting">
+            <span class="spinner" x-show="submitting" x-cloak aria-hidden="true"></span>
+            <span x-text="submitting ? 'Lancement…' : 'Lancer l\'analyse'"></span>
           </button>
         </div>
-      </template>
+      </form>
     </div>
   </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script>
 function dashboardApp() {
   return {
     scans: [], loading: true,
-    showForm: false, formError: '',
+    showForm: false, formError: '', submitting: false,
     newScan: { target: '', scan_type: 'web' },
-    submitting: false,
-    _interval: null,
-    _riskChart: null,
-    _sevChart: null,
-    _complianceData: null,  // cache from last scan with compliance
+    auth: { login_identifier: '', password: '', login_url: '', provided_token: '' },
+    query: '', typeFilter: '',
+    types: SS_TYPES,
+    _complianceData: null,
 
-    /* ── Computed ── */
-    get completedScans() {
-      return this.scans.filter(s => s.status === 'completed');
-    },
-    get complianceScans() {
-      return this.scans.filter(s => s.compliance_score != null).slice(0, 1);
-    },
+    get completedScans() { return this.scans.filter(s => s.status === 'completed'); },
+    get complianceScan() { return this.scans.find(s => s.compliance_score != null) || null; },
 
-    getFrameworkScore(label) {
-      if (!this._complianceData) return null;
-      const map = { 'OWASP': 'OWASP Top 10', 'PCI-DSS': 'PCI-DSS', 'ISO 27001': 'ISO 27001', 'RGPD': 'GDPR' };
-      const fw = this._complianceData.find(f => f.framework === map[label]);
-      return fw ? fw.overall_score : null;
+    get filteredScans() {
+      const q = this.query.trim().toLowerCase();
+      return this.scans.filter(s =>
+        (!q || s.target.toLowerCase().includes(q)) &&
+        (!this.typeFilter || s.scan_type === this.typeFilter));
     },
 
-    /* ── Lifecycle ── */
-    async init() {
-      window.addEventListener('open-new-scan', (e) => {
-        this.newScan.scan_type = e.detail?.type || 'web';
-        this.showForm = true;
+    get sevRows() {
+      const rows = [
+        ['critical', 'Critique', 'critical_count'], ['high', 'Élevée', 'high_count'],
+        ['medium', 'Moyenne', 'medium_count'], ['low', 'Faible', 'low_count'],
+      ].map(([key, label, f]) => ({ key, label, n: this.completedScans.reduce((a, s) => a + (s[f] || 0), 0) }));
+      const max = Math.max(1, ...rows.map(r => r.n));
+      return rows.map(r => ({ ...r, pct: (r.n / max) * 100 }));
+    },
+
+    get riskRows() {
+      return this.completedScans
+        .filter(s => s.risk_score != null)
+        .slice(0, 10)
+        .map(s => ({ ...s, label: s.target.replace(/^https?:\/\//, ''), cls: s.risk_score >= 7 ? 'critical' : s.risk_score >= 4 ? 'medium' : 'ok' }));
+    },
+
+    get frameworkRows() {
+      const map = [['OWASP Top 10', 'OWASP Top 10'], ['PCI-DSS', 'PCI-DSS'], ['ISO 27001', 'ISO 27001'], ['RGPD', 'GDPR']];
+      return map.map(([label, key]) => {
+        const fw = (this._complianceData || []).find(f => f.framework === key);
+        const score = fw ? fw.overall_score : null;
+        return { label, score, cls: score === null ? '' : score >= 60 ? 'ok' : score >= 40 ? 'medium' : 'critical' };
       });
-      const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('scan')) {
-        this.newScan.scan_type = urlParams.get('scan');
-        this.showForm = true;
+    },
+
+    get placeholder() {
+      return {
+        web: 'https://example.com', authenticated_web: 'https://app.example.com', api: 'https://api.example.com',
+        network: '192.168.1.0/24 ou 192.168.1.1', subdomain: 'example.com', osint: 'example.com', cti: 'example.com ou 1.2.3.4',
+      }[this.newScan.scan_type] || '';
+    },
+
+    sum(field) { return this.completedScans.reduce((a, s) => a + (s[field] || 0), 0); },
+    icon(t) { return SS_ICON[t] || ''; },
+    typeLabel(t) { return SS_TYPE_LABEL[t] || t; },
+    statusLabel(s) { return { pending: 'En attente', running: 'En cours', completed: 'Terminé', failed: 'Échec' }[s] || s; },
+    statusDot(s) { return { pending: 'pending', running: 'run', completed: 'ok', failed: 'fail' }[s] || ''; },
+    riskCls(r) { return r == null ? 'muted' : r >= 7 ? 'c-critical' : r >= 5 ? 'c-high' : r >= 3 ? 'c-medium' : 'c-ok'; },
+    findings(s) {
+      if (s.status !== 'completed') return '—';
+      if (s.scan_type === 'subdomain') return (s.subdomain_count ?? '—') + ' sous-domaines';
+      if (s.scan_type === 'api') return (s.api_endpoint_count ?? '—') + ' endpoints';
+      return s.vuln_count ?? 0;
+    },
+    fmtDate(d) {
+      return new Date(d).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    },
+    go(id) { window.location.href = '/scans/' + id; },
+
+    async init() {
+      window.addEventListener('open-new-scan', (e) => this.openForm(e.detail?.type || 'web'));
+      const p = new URLSearchParams(window.location.search).get('scan');
+      if (p) {
+        this.openForm(p);
         window.history.replaceState({}, '', '/dashboard');
       }
       await this.fetchScans();
-      this._interval = setInterval(() => this.fetchScans(), 5000);
-
-      // Re-render charts when theme changes
-      window.addEventListener('ss-theme-changed', () => {
-        this.$nextTick(() => this.renderCharts());
-      });
+      setInterval(() => {
+        if (this.scans.some(s => s.status === 'running' || s.status === 'pending')) this.fetchScans();
+      }, 5000);
     },
+
+    openForm(type) {
+      this.newScan.scan_type = SS_TYPE_LABEL[type] ? type : 'web';
+      this.formError = '';
+      this.showForm = true;
+      this.$nextTick(() => this.$refs.target?.focus());
+    },
+    closeForm() { this.showForm = false; this.formError = ''; },
 
     async fetchScans() {
       try {
         const res = await apiFetch('/scans');
         if (res.ok) {
           this.scans = await res.json();
-          // Load compliance detail for latest compliant scan
-          const withCompliance = this.scans.find(s => s.compliance_score != null);
-          if (withCompliance) {
-            this._loadComplianceDetail(withCompliance.id);
-          }
-          this.$nextTick(() => this.renderCharts());
+          const c = this.complianceScan;
+          if (c && c.id !== this._complianceFor) this._loadCompliance(c.id);
         }
       } finally {
         this.loading = false;
       }
     },
 
-    async _loadComplianceDetail(scanId) {
+    async _loadCompliance(id) {
+      this._complianceFor = id;
       try {
-        const res = await apiFetch('/scans/' + scanId);
-        if (res.ok) {
-          const data = await res.json();
-          this._complianceData = data.compliance_reports?.frameworks || null;
-        }
+        const res = await apiFetch('/scans/' + id);
+        if (res.ok) this._complianceData = (await res.json()).compliance_reports?.frameworks || null;
       } catch {}
     },
 
-    /* ── Charts ── */
-    renderCharts() {
-      const completed = this.completedScans;
-      if (!completed.length) return;
-      const isDark = document.documentElement.classList.contains('dark');
-      const textColor  = isDark ? '#9ca3af' : '#6b7280';
-      const gridColor  = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
-      const bgCard     = isDark ? '#111827' : '#ffffff';
-
-      Chart.defaults.font.family = 'ui-sans-serif, system-ui, -apple-system, sans-serif';
-      Chart.defaults.font.size   = 11;
-      Chart.defaults.color       = textColor;
-
-      /* ── Bar chart : Scores de risque ── */
-      const riskScans = completed
-        .filter(s => s.scan_type !== 'cti' && s.risk_score != null)
-        .slice(0, 10)
-        .reverse();
-
-      const riskLabels = riskScans.map(s => {
-        const t = s.target.replace(/^https?:\/\//, '');
-        return t.length > 18 ? t.slice(0, 16) + '…' : t;
-      });
-      const riskData  = riskScans.map(s => s.risk_score);
-      const riskColors = riskData.map(v =>
-        v >= 7 ? '#ef4444' : v >= 4 ? '#f59e0b' : '#22c55e'
-      );
-
-      if (this._riskChart) this._riskChart.destroy();
-      const riskCtx = document.getElementById('riskChart');
-      if (riskCtx && riskData.length) {
-        this._riskChart = new Chart(riskCtx, {
-          type: 'bar',
-          data: {
-            labels: riskLabels,
-            datasets: [{
-              data: riskData,
-              backgroundColor: riskColors.map(c => c + '33'),
-              borderColor: riskColors,
-              borderWidth: 2,
-              borderRadius: 6,
-              borderSkipped: false,
-            }]
-          },
-          options: {
-            animation: false,
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                backgroundColor: bgCard,
-                titleColor: isDark ? '#f9fafb' : '#111827',
-                bodyColor: textColor,
-                borderColor: gridColor,
-                borderWidth: 1,
-                padding: 10,
-                callbacks: {
-                  label: ctx => ` Score de risque : ${ctx.raw.toFixed(1)} / 10`,
-                }
-              }
-            },
-            scales: {
-              x: {
-                grid: { display: false },
-                border: { display: false },
-                ticks: { color: textColor, maxRotation: 35 }
-              },
-              y: {
-                min: 0, max: 10,
-                grid: { color: gridColor },
-                border: { display: false },
-                ticks: { color: textColor, stepSize: 2 }
-              }
-            }
-          }
-        });
-      }
-
-      /* ── Donut : Sévérités ── */
-      const totals = ['critical_count','high_count','medium_count','low_count']
-        .map(k => completed.reduce((a, s) => a + (s[k] || 0), 0));
-      const totalVulns = totals.reduce((a, b) => a + b, 0);
-
-      if (this._sevChart) this._sevChart.destroy();
-      const sevCtx = document.getElementById('sevChart');
-      if (sevCtx && totalVulns > 0) {
-        this._sevChart = new Chart(sevCtx, {
-          type: 'doughnut',
-          data: {
-            labels: ['Critique', 'Élevé', 'Moyen', 'Faible'],
-            datasets: [{
-              data: totals,
-              backgroundColor: ['#ef4444', '#f97316', '#f59e0b', '#60a5fa'],
-              borderWidth: 0,
-              hoverOffset: 4,
-            }]
-          },
-          options: {
-            animation: false,
-            responsive: true,
-            maintainAspectRatio: false,
-            cutout: '72%',
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                backgroundColor: bgCard,
-                titleColor: isDark ? '#f9fafb' : '#111827',
-                bodyColor: textColor,
-                borderColor: gridColor,
-                borderWidth: 1,
-                padding: 10,
-                callbacks: {
-                  label: ctx => ` ${ctx.label} : ${ctx.raw} (${((ctx.raw/totalVulns)*100).toFixed(0)}%)`
-                }
-              }
-            }
-          }
-        });
-      } else if (sevCtx && totalVulns === 0) {
-        // All clear
-        this._sevChart = new Chart(sevCtx, {
-          type: 'doughnut',
-          data: {
-            datasets: [{ data: [1], backgroundColor: ['#22c55e'], borderWidth: 0 }]
-          },
-          options: {
-            animation: false, responsive: true, maintainAspectRatio: false,
-            cutout: '72%', plugins: { legend: { display: false }, tooltip: { enabled: false } }
-          }
-        });
-      }
-    },
-
-    /* ── CRUD ── */
     async createScan() {
-      this.formError = ''; this.submitting = true;
-      try {
-        const res = await apiFetch('/scans', {
-          method: 'POST',
-          body: JSON.stringify({ target: this.newScan.target, scan_type: this.newScan.scan_type }),
-        });
-        if (!res.ok) {
-          const d = await res.json();
-          this.formError = d.detail || 'Erreur lors du lancement';
+      this.formError = '';
+      if (!this.newScan.target.trim()) { this.formError = 'Indiquez une cible.'; return; }
+      const payload = { target: this.newScan.target.trim(), scan_type: this.newScan.scan_type };
+      if (payload.scan_type === 'authenticated_web') {
+        if (!this.auth.provided_token && (!this.auth.login_identifier || !this.auth.password)) {
+          this.formError = "Renseignez l'identifiant et le mot de passe, ou un jeton d'accès.";
           return;
         }
+        payload.auth_config = {
+          login_identifier: this.auth.login_identifier || 'token',
+          password: this.auth.password || '',
+          login_url: this.auth.login_url || null,
+          provided_token: this.auth.provided_token || null,
+        };
+      }
+      this.submitting = true;
+      try {
+        const res = await apiFetch('/scans', { method: 'POST', body: JSON.stringify(payload) });
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          this.formError = typeof d.detail === 'string' ? d.detail : "Impossible de lancer l'analyse.";
+          return;
+        }
+        const scan = await res.json();
         this.showForm = false;
         this.newScan = { target: '', scan_type: 'web' };
-        await this.fetchScans();
+        this.auth = { login_identifier: '', password: '', login_url: '', provided_token: '' };
+        window.location.href = '/scans/' + scan.id;
       } finally {
         this.submitting = false;
       }
     },
 
     async deleteScan(id) {
-      if (!confirm('Supprimer ce scan ? Cette action est irréversible.')) return;
+      if (!confirm('Supprimer cette analyse ? Cette action est irréversible.')) return;
       await apiFetch('/scans/' + id, { method: 'DELETE' });
       this.scans = this.scans.filter(s => s.id !== id);
-      this.$nextTick(() => this.renderCharts());
-    }
-  }
+    },
+  };
 }
 </script>
 {% endblock %}

@@ -1,915 +1,780 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8"/>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rapport de sécurité — {{ scan.target }}</title>
+{#
+  SuturaSec — modèle de rapport (HTML imprimable + WeasyPrint)
+  Variables attendues (inchangées) : scan, vulnerabilities, sev_counts, risk_label,
+  scan_type_label, attack_paths, compliance, threat_intel, subdomain, api, osint, generated_at.
+  Filtres utilisés : fmt_date, sev_label (présents dans main.py et pdf_report.py).
+#}
 <style>
-/* ================================================================
-   WEASYPRINT PDF REPORT — SuturaSec
-   ================================================================ */
 @page {
   size: A4;
-  margin: 18mm 16mm 22mm 16mm;
-  @bottom-left {
-    content: "SuturaSec — Rapport Confidentiel";
-    font-size: 7.5pt; color: #9ca3af; font-family: Arial, sans-serif;
-  }
-  @bottom-right {
-    content: "Page " counter(page) " / " counter(pages);
-    font-size: 7.5pt; color: #9ca3af; font-family: Arial, sans-serif;
-  }
+  margin: 20mm 18mm 22mm;
+  @bottom-left  { content: "SuturaSec · Confidentiel"; font: 7.5pt Inter, Helvetica, Arial, sans-serif; color: #8A8A93; }
+  @bottom-right { content: counter(page) " / " counter(pages); font: 7.5pt Inter, Helvetica, Arial, sans-serif; color: #8A8A93; }
 }
-@page cover-page {
-  margin: 0;
-  @bottom-left  { content: none; }
-  @bottom-right { content: none; }
-}
-* { box-sizing: border-box; margin: 0; padding: 0; }
+@page :first { margin: 0; @bottom-left { content: none; } @bottom-right { content: none; } }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
 body {
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 9.5pt; line-height: 1.55; color: #1f2937; background: white;
+  font-family: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 9.5pt; line-height: 1.5; color: #1A1A1E; background: #fff;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
 }
+h1, h2, h3, h4, p { margin: 0; }
+.mono { font-family: "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, "Courier New", monospace; }
+.muted { color: #6B6B73; }
+.num { font-variant-numeric: tabular-nums; }
+.nb { break-inside: avoid; page-break-inside: avoid; }
 
-/* ================================================================ COVER */
-.cover {
-  page: cover-page; page-break-after: always;
-  background: linear-gradient(155deg, #0f0b2e 0%, #1e1b4b 50%, #312e81 100%);
-  min-height: 297mm; color: white;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  padding: 20mm; text-align: center;
+/* severity / status colors */
+.c-critical { color: #8F1D12; } .c-high { color: #C4320A; } .c-medium { color: #A15C07; }
+.c-low { color: #1F4FD1; } .c-info { color: #52525B; } .c-ok { color: #15803D; }
+.bg-critical { background: #8F1D12; } .bg-high { background: #C4320A; } .bg-medium { background: #C98A1B; }
+.bg-low { background: #1F4FD1; } .bg-info { background: #A1A1AA; } .bg-ok { background: #15803D; }
+
+/* ---------- Screen chrome ---------- */
+.toolbar { display: none; }
+@media screen {
+  body { background: #EDEDEA; }
+  .toolbar {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    position: sticky; top: 0; z-index: 10; background: #fff; border-bottom: 1px solid #E4E4E0;
+    padding: 10px 20px; font-size: 13px;
+  }
+  .toolbar b { font-weight: 600; }
+  .toolbar button {
+    display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 16px;
+    border: 0; border-radius: 8px; background: #18181B; color: #fff; font: inherit; font-weight: 500; cursor: pointer;
+  }
+  .toolbar button:hover { background: #2E2E33; }
+  .page { width: 210mm; max-width: 100%; margin: 24px auto; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.08); padding: 20mm 18mm 22mm; }
+  .page.cover-page { padding: 0; }
 }
-.cover-brand     { font-size: 24pt; font-weight: 900; letter-spacing: -0.5pt; color: white; margin-bottom: 1mm; }
-.cover-brand-sub { font-size: 7pt; letter-spacing: 4pt; text-transform: uppercase; color: #a5b4fc; margin-bottom: 14mm; }
-.cover-rep-title { font-size: 26pt; font-weight: 900; color: white; margin-bottom: 2mm; letter-spacing: -0.5pt; }
-.cover-rep-type  { font-size: 11pt; color: #a5b4fc; margin-bottom: 12mm; letter-spacing: 0.5pt; }
-.cover-divider   { width: 20mm; height: 1pt; background: rgba(255,255,255,0.2); margin: 0 auto 10mm; }
-.cover-target    { font-size: 14pt; font-weight: bold; color: white; word-break: break-all; margin-bottom: 2mm; max-width: 150mm; }
-.cover-meta-line { font-size: 9pt; color: #c7d2fe; margin-bottom: 1mm; }
-.cover-risk-block {
-  margin-top: 12mm; display: inline-block; border-radius: 5mm; padding: 6mm 14mm;
-  border: 1.5pt solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.08); min-width: 55mm;
+@media screen and (max-width: 820px) {
+  .page { margin: 0; box-shadow: none; padding: 24px 16px; }
+  .cover { min-height: auto !important; padding: 32px 16px !important; }
 }
-.cover-risk-lbl { font-size: 7pt; letter-spacing: 3pt; text-transform: uppercase; color: #a5b4fc; margin-bottom: 2mm; }
-.cover-score-line { display: flex; align-items: flex-end; justify-content: center; gap: 1mm; }
-.cover-score-num  { font-size: 46pt; font-weight: 900; line-height: 1; }
-.cover-score-den  { font-size: 14pt; color: rgba(255,255,255,0.5); padding-bottom: 4pt; }
-.cover-risk-lvl   { font-size: 10pt; font-weight: bold; letter-spacing: 2pt; text-transform: uppercase; margin-top: 1mm; }
-.cover-stats-row  { display: flex; gap: 6mm; margin-top: 10mm; justify-content: center; }
-.cover-stat-num   { font-size: 20pt; font-weight: 900; line-height: 1; }
-.cover-stat-lbl   { font-size: 7pt; letter-spacing: 1pt; text-transform: uppercase; color: #a5b4fc; margin-top: 1mm; }
-.cover-footer     { margin-top: 18mm; font-size: 7pt; color: rgba(255,255,255,0.3); }
-
-/* color helpers */
-.col-critical { color: #f87171; }
-.col-high     { color: #fb923c; }
-.col-medium   { color: #fbbf24; }
-.col-low      { color: #4ade80; }
-.col-info     { color: #9ca3af; }
-
-/* ================================================================ SECTIONS */
-.section { page-break-before: always; }
-.no-break { page-break-inside: avoid; }
-.section-header {
-  border-bottom: 2pt solid #4f46e5; padding-bottom: 3mm; margin-bottom: 7mm;
-  display: flex; align-items: flex-end; gap: 3mm;
-}
-.section-num {
-  font-size: 9pt; font-weight: bold; color: #6366f1;
-  background: #eef2ff; border: 1pt solid #c7d2fe; border-radius: 1.5mm;
-  padding: 0.5mm 2.5mm; flex-shrink: 0; line-height: 1.4;
-}
-.section-title { font-size: 16pt; font-weight: 900; color: #312e81; letter-spacing: -0.3pt; }
-.section-desc  { font-size: 8.5pt; color: #9ca3af; margin-top: 1mm; }
-h3 {
-  font-size: 11pt; font-weight: bold; color: #374151; margin: 5mm 0 3mm;
-  border-left: 3pt solid #c7d2fe; padding-left: 3mm;
-}
-h3:first-child { margin-top: 0; }
-
-/* ================================================================ STATS */
-.stats-grid { display: flex; gap: 3mm; margin-bottom: 7mm; }
-.stat-card  { flex: 1; text-align: center; padding: 4mm 3mm; border-radius: 3mm; border: 1pt solid #e5e7eb; }
-.stat-label { font-size: 7pt; font-weight: bold; text-transform: uppercase; letter-spacing: 1pt; color: #9ca3af; margin-bottom: 2mm; }
-.stat-value { font-size: 24pt; font-weight: 900; line-height: 1; }
-.card-critical { border-color:#fca5a5; background:#fff5f5; }
-.card-high     { border-color:#fdba74; background:#fff8f1; }
-.card-medium   { border-color:#fde68a; background:#fffdf0; }
-.card-low      { border-color:#93c5fd; background:#f0f7ff; }
-.card-total    { border-color:#c7d2fe; background:#f0f4ff; }
-.card-violet   { border-color:#c4b5fd; background:#f5f3ff; }
-.card-green    { border-color:#86efac; background:#f0fdf4; }
-.val-critical  { color:#dc2626; }
-.val-high      { color:#ea580c; }
-.val-medium    { color:#d97706; }
-.val-low       { color:#2563eb; }
-.val-total     { color:#4f46e5; }
-.val-violet    { color:#7c3aed; }
-.val-green     { color:#16a34a; }
-
-/* ================================================================ SUMMARY BOX */
-.sum-box { background:#f0f4ff; border-left:4pt solid #4f46e5; padding:5mm 5mm 5mm 6mm; border-radius:0 3mm 3mm 0; margin-bottom:6mm; }
-.sum-box-lbl  { font-size:7pt; font-weight:bold; text-transform:uppercase; letter-spacing:1.5pt; color:#6366f1; margin-bottom:2mm; }
-.sum-box-txt  { font-size:10pt; color:#374151; line-height:1.7; }
-.sum-box-warn { background:#fff8f1; border-color:#f97316; }
-.sum-lbl-warn { color:#ea580c; }
-
-/* ================================================================ VULN CARDS */
-.vuln-card { border:1pt solid #e5e7eb; border-radius:3mm; margin-bottom:5mm; overflow:hidden; page-break-inside:avoid; }
-.vuln-head { padding:3.5mm 4mm; display:flex; align-items:flex-start; gap:3mm; }
-.vh-critical { background:#fff5f5; border-left:4pt solid #dc2626; }
-.vh-high     { background:#fff8f1; border-left:4pt solid #ea580c; }
-.vh-medium   { background:#fffdf0; border-left:4pt solid #d97706; }
-.vh-low      { background:#f0f7ff; border-left:4pt solid #3b82f6; }
-.vh-info     { background:#f9fafb; border-left:4pt solid #9ca3af; }
-.vuln-badge  { font-size:7pt; font-weight:bold; text-transform:uppercase; letter-spacing:0.5pt; padding:1mm 2.5mm; border-radius:1.5mm; white-space:nowrap; flex-shrink:0; margin-top:0.5pt; }
-.b-critical { background:#dc2626; color:white; }
-.b-high     { background:#ea580c; color:white; }
-.b-medium   { background:#d97706; color:white; }
-.b-low      { background:#3b82f6; color:white; }
-.b-info     { background:#9ca3af; color:white; }
-.vuln-title-area { flex:1; }
-.vuln-title    { font-size:10.5pt; font-weight:bold; color:#111827; }
-.vuln-category { font-size:8pt; color:#9ca3af; margin-top:0.5mm; }
-.vuln-cvss     { font-size:10pt; font-weight:bold; color:#6b7280; flex-shrink:0; background:#f3f4f6; border:1pt solid #e5e7eb; border-radius:2mm; padding:1mm 2.5mm; white-space:nowrap; }
-.vuln-body     { padding:4mm; border-top:1pt solid #f3f4f6; }
-.vlbl  { font-size:7pt; font-weight:bold; text-transform:uppercase; letter-spacing:0.5pt; color:#9ca3af; margin-bottom:1mm; margin-top:3.5mm; }
-.vlbl:first-child { margin-top:0; }
-.vtxt  { font-size:9pt; color:#374151; line-height:1.6; }
-.vevid { font-family:"Courier New",monospace; font-size:8pt; color:#4b5563; background:#f3f4f6; padding:2.5mm; border-radius:2mm; word-break:break-all; }
-.vremed{ background:#f0fdf4; border-left:3pt solid #22c55e; padding:3mm 3.5mm; border-radius:0 2mm 2mm 0; font-size:9pt; color:#166534; line-height:1.6; }
-
-/* ================================================================ TABLES */
-table { width:100%; border-collapse:collapse; margin-bottom:5mm; font-size:9pt; }
-th { background:#f3f4f6; font-weight:bold; text-align:left; padding:2.5mm 3mm; border:1pt solid #e5e7eb; font-size:7.5pt; text-transform:uppercase; letter-spacing:0.5pt; color:#6b7280; }
-td { padding:2.5mm 3mm; border:1pt solid #e5e7eb; vertical-align:top; }
-tr:nth-child(even) td { background:#fafafa; }
-
-/* ================================================================ COMPLIANCE */
-.fw-block  { border:1pt solid #e5e7eb; border-radius:3mm; margin-bottom:5mm; overflow:hidden; page-break-inside:avoid; }
-.fw-header { padding:4mm 5mm; display:flex; align-items:center; gap:4mm; border-bottom:1pt solid #e5e7eb; }
-.fw-grade-box { width:14mm; height:14mm; border-radius:3mm; display:flex; align-items:center; justify-content:center; font-size:20pt; font-weight:900; flex-shrink:0; color:white; }
-.fw-meta   { flex:1; }
-.fw-name   { font-size:11pt; font-weight:bold; color:#111827; }
-.fw-ver    { font-size:8.5pt; color:#9ca3af; }
-.fw-stmt   { font-size:8.5pt; color:#6b7280; margin-top:0.5mm; }
-.fw-score  { font-size:22pt; font-weight:900; flex-shrink:0; }
-.fw-ctrl-row { padding:2.5mm 5mm; display:flex; align-items:center; gap:3mm; border-bottom:0.5pt solid #f3f4f6; }
-.fw-ctrl-row:last-child { border-bottom:none; }
-.dot { width:5mm; height:5mm; border-radius:50%; flex-shrink:0; }
-.dot-pass    { background:#22c55e; }
-.dot-fail    { background:#ef4444; }
-.dot-partial { background:#f59e0b; }
-.dot-na      { background:#d1d5db; }
-.ctrl-id    { font-size:7.5pt; font-family:"Courier New",monospace; color:#9ca3af; width:22mm; flex-shrink:0; }
-.ctrl-title { flex:1; font-size:8.5pt; color:#374151; }
-.ctrl-score { font-size:8.5pt; font-weight:bold; width:12mm; text-align:right; flex-shrink:0; }
-.ctrl-lbl   { font-size:7pt; font-weight:bold; padding:0.5mm 2mm; border-radius:1mm; flex-shrink:0; white-space:nowrap; }
-.lbl-pass    { background:#dcfce7; color:#166534; }
-.lbl-fail    { background:#fee2e2; color:#991b1b; }
-.lbl-partial { background:#fef3c7; color:#92400e; }
-.lbl-na      { background:#f3f4f6; color:#6b7280; }
-
-/* ================================================================ CTI */
-.cti-grid { display:flex; gap:3mm; margin-bottom:4mm; }
-.cti-card  { flex:1; border:1pt solid #e5e7eb; border-radius:3mm; padding:3.5mm; }
-.cti-card-title { font-size:7pt; font-weight:bold; text-transform:uppercase; letter-spacing:0.5pt; color:#9ca3af; margin-bottom:1.5mm; }
-.cti-value { font-size:9.5pt; font-weight:bold; color:#111827; }
-.cti-sub   { font-size:8pt; color:#6b7280; margin-top:0.5mm; }
-.dnsbl-hit   { color:#dc2626; font-weight:bold; }
-.dnsbl-clean { color:#16a34a; }
-.info-row { display:flex; justify-content:space-between; padding:2mm 0; border-bottom:0.5pt solid #f3f4f6; }
-.info-row:last-child { border-bottom:none; }
-.ir-key { font-size:8.5pt; color:#6b7280; }
-.ir-val { font-size:8.5pt; font-weight:bold; color:#111827; }
-
-/* ================================================================ SUBDOMAIN */
-.status-2xx { color:#16a34a; font-weight:bold; }
-.status-3xx { color:#2563eb; font-weight:bold; }
-.status-4xx { color:#d97706; font-weight:bold; }
-.status-5xx { color:#dc2626; font-weight:bold; }
-.to-badge  { background:#dc2626; color:white; font-size:6.5pt; font-weight:bold; padding:0.5mm 1.5mm; border-radius:1mm; text-transform:uppercase; }
-.src-badge { font-size:7pt; padding:0.5mm 2mm; border-radius:1mm; font-weight:bold; }
-.src-crtsh        { background:#eef2ff; color:#4f46e5; }
-.src-hackertarget { background:#ecfdf5; color:#065f46; }
-.src-bruteforce   { background:#f3f4f6; color:#6b7280; }
-.src-dns_records  { background:#fffbeb; color:#92400e; }
-
-/* ================================================================ REMEDIATION */
-.prio-card { display:flex; gap:3mm; margin-bottom:4mm; border:1pt solid #e5e7eb; border-radius:3mm; padding:4mm; page-break-inside:avoid; }
-.prio-num  { background:#f97316; color:white; width:8mm; height:8mm; border-radius:2mm; font-weight:900; font-size:11pt; text-align:center; line-height:8mm; flex-shrink:0; }
-.prio-action { font-size:10pt; font-weight:bold; color:#111827; margin-bottom:1mm; }
-.prio-reason { font-size:8.5pt; color:#6b7280; margin-bottom:2mm; }
-.prio-meta   { font-size:8pt; color:#9ca3af; }
-.prio-meta span { color:#374151; font-weight:bold; }
-.qw-row  { display:flex; gap:2.5mm; padding:2mm 0; border-bottom:0.5pt solid #f3f4f6; page-break-inside:avoid; }
-.qw-row:last-child { border-bottom:none; }
-.qw-num  { background:#4f46e5; color:white; width:5mm; height:5mm; border-radius:50%; font-size:7pt; font-weight:bold; text-align:center; line-height:5mm; flex-shrink:0; margin-top:1pt; }
-.qw-text { font-size:9pt; color:#374151; flex:1; }
-.ap-card  { border:1pt solid #e5e7eb; border-radius:3mm; padding:4mm; margin-bottom:4mm; page-break-inside:avoid; }
-.ap-title { font-size:10pt; font-weight:bold; color:#111827; margin-bottom:2mm; }
-.ap-step  { display:flex; gap:2mm; font-size:8.5pt; color:#374151; margin-bottom:1.5mm; }
-.ap-arrow { color:#9ca3af; flex-shrink:0; }
-
-/* ================================================================ FOOTER */
-.conf-footer { margin-top:12mm; text-align:center; padding:3mm; background:#f9fafb; border:1pt solid #e5e7eb; border-radius:2mm; font-size:8pt; color:#9ca3af; }
-
-/* callout boxes */
-.callout { padding:4mm 5mm; border-radius:3mm; margin-bottom:5mm; }
-.callout-err  { background:#fef2f2; border:1pt solid #fecaca; }
-.callout-warn { background:#fffbeb; border:1pt solid #fde68a; }
-.callout-ok   { background:#f0fdf4; border:1pt solid #bbf7d0; }
-
-/* ================================================================ PRINT BUTTON (screen only) */
-#print-btn {
-  position: fixed;
-  bottom: 28px;
-  right: 28px;
-  z-index: 9999;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: #4f46e5;
-  color: #fff;
-  border: none;
-  border-radius: 50px;
-  padding: 12px 22px;
-  font-size: 14px;
-  font-weight: 600;
-  font-family: system-ui, sans-serif;
-  cursor: pointer;
-  box-shadow: 0 4px 20px rgba(79,70,229,0.45);
-  transition: background .15s, transform .1s;
-}
-#print-btn:hover { background: #4338ca; transform: translateY(-1px); }
-#print-btn svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
 @media print {
-  #print-btn { display: none !important; }
+  .page { padding: 0; }
+  .page + .page { break-before: page; page-break-before: always; }
 }
 
+/* ---------- Cover ---------- */
+.cover { min-height: 297mm; padding: 24mm 22mm 20mm; display: flex; flex-direction: column; }
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 11pt; letter-spacing: -0.01em; }
+.brand svg { width: 18px; height: 18px; }
+.cover-top { display: flex; justify-content: space-between; align-items: center; padding-bottom: 6mm; border-bottom: 1px solid #E4E4E0; }
+.cover-top .label { font-size: 8pt; color: #6B6B73; text-transform: uppercase; letter-spacing: .08em; }
+.cover-main { margin-top: 28mm; }
+.cover-toc { margin-top: 12mm; max-width: 110mm; }
+.cover-toc .toc li { font-size: 9pt; padding: 1.6mm 0; }
+.cover-kicker { font-size: 9pt; color: #6B6B73; text-transform: uppercase; letter-spacing: .08em; }
+.cover-title { margin-top: 4mm; font-size: 30pt; font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; }
+.cover-target { margin-top: 6mm; font-size: 15pt; font-weight: 500; word-break: break-all; }
+.cover-meta { margin-top: 14mm; display: table; border-collapse: collapse; font-size: 9pt; }
+.cover-meta div { display: table-row; }
+.cover-meta span { display: table-cell; padding: 1.6mm 10mm 1.6mm 0; }
+.cover-meta span:first-child { color: #6B6B73; }
+.cover-scores { margin-top: auto; display: flex; gap: 0; border-top: 1px solid #1A1A1E; padding-top: 7mm; }
+.cover-score { flex: 1; padding-right: 6mm; }
+.cover-score + .cover-score { padding-left: 6mm; border-left: 1px solid #E4E4E0; }
+.cover-score .k { font-size: 8pt; color: #6B6B73; }
+.cover-score .v { font-size: 26pt; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; }
+.cover-score .v small { font-size: 10pt; font-weight: 400; color: #6B6B73; letter-spacing: 0; }
+.cover-score .s { font-size: 9pt; font-weight: 500; }
+.cover-foot { margin-top: 10mm; font-size: 7.5pt; color: #8A8A93; }
+
+/* ---------- Sections ---------- */
+.section { margin-bottom: 12mm; }
+.section.np { break-before: page; page-break-before: always; }
+@media screen { .section.np { margin-top: 16mm; padding-top: 12mm; border-top: 1px dashed #D4D4D0; } }
+.section-head, h3 { break-after: avoid; page-break-after: avoid; }
+.section-head { display: flex; align-items: baseline; gap: 4mm; padding-bottom: 2.5mm; border-bottom: 1px solid #1A1A1E; margin-bottom: 5mm; }
+.section-num { font-size: 9pt; color: #6B6B73; font-variant-numeric: tabular-nums; min-width: 7mm; }
+.section-title { font-size: 14pt; font-weight: 600; letter-spacing: -0.01em; flex: 0 0 auto; white-space: nowrap; }
+.section-desc { margin-left: auto; flex: 0 1 auto; min-width: 0; font-size: 8pt; color: #6B6B73; text-align: right; }
+h3 { font-size: 10.5pt; font-weight: 600; margin: 7mm 0 3mm; }
+h3:first-child { margin-top: 0; }
+p + p { margin-top: 2.5mm; }
+.lead { font-size: 10pt; color: #2E2E33; }
+
+/* toc */
+.toc { list-style: none; margin: 0; padding: 0; }
+.toc li { display: flex; gap: 4mm; padding: 2.4mm 0; border-bottom: 1px solid #EFEFEC; font-size: 10pt; }
+.toc li span:first-child { color: #6B6B73; min-width: 7mm; font-variant-numeric: tabular-nums; }
+
+/* key/value table & data tables */
+table { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+th { text-align: left; font-weight: 500; color: #6B6B73; padding: 2mm 2.5mm; border-bottom: 1px solid #D4D4D0; white-space: nowrap; }
+td { padding: 2.2mm 2.5mm; border-bottom: 1px solid #EFEFEC; vertical-align: top; color: #2E2E33; }
+th:first-child, td:first-child { padding-left: 0; }
+th:last-child, td:last-child { padding-right: 0; }
+tr { break-inside: avoid; page-break-inside: avoid; }
+.r { text-align: right; }
+.kv td:first-child { width: 36%; color: #6B6B73; }
+.kv td:last-child { color: #1A1A1E; }
+.trunc { color: #8A8A93; font-style: italic; text-align: center; }
+
+/* stat strip */
+.stats { display: flex; border: 1px solid #E4E4E0; border-radius: 2mm; margin-bottom: 5mm; }
+.stat { flex: 1; padding: 3.5mm 4mm; }
+.stat + .stat { border-left: 1px solid #E4E4E0; }
+.stat .k { font-size: 7.5pt; color: #6B6B73; }
+.stat .v { font-size: 16pt; font-weight: 600; letter-spacing: -0.01em; line-height: 1.3; font-variant-numeric: tabular-nums; }
+.stat .v.sm { font-size: 10.5pt; padding-top: 1.5mm; }
+.stat .s { font-size: 7.5pt; color: #6B6B73; }
+
+/* severity distribution bar */
+.dist { display: flex; height: 2.2mm; border-radius: 1mm; overflow: hidden; margin: 1mm 0 3mm; }
+.dist span { display: block; height: 100%; }
+.dist span + span { margin-left: 0.6mm; }
+
+/* labels */
+.sev { display: inline-block; font-size: 7.5pt; font-weight: 600; white-space: nowrap; }
+.sev::before { content: ""; display: inline-block; width: 2mm; height: 2mm; border-radius: 0.4mm; background: currentColor; margin-right: 1.5mm; vertical-align: 0.1mm; }
+.tag { display: inline-block; padding: 0.3mm 2mm; border: 1px solid #D4D4D0; border-radius: 4mm; font-size: 7.5pt; color: #3F3F46; white-space: nowrap; margin: 0 1mm 1mm 0; }
+.tag.fail { border-color: #F2C4BE; background: #FDECEA; color: #8F1D12; }
+.tag.warn { border-color: #EED9B0; background: #FDF4E3; color: #8A4E05; }
+.tag.ok { border-color: #BFE3CC; background: #E9F6EE; color: #116231; }
+
+/* callouts */
+.callout { border-left: 0; border: 1px solid #E4E4E0; border-radius: 2mm; padding: 4mm 5mm; background: #FAFAF8; margin-bottom: 4mm; }
+.callout .k { font-size: 7.5pt; color: #6B6B73; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 1.5mm; }
+.callout.warn { background: #FDF8EE; border-color: #EED9B0; }
+
+/* numbered list */
+.steps { list-style: none; margin: 0; padding: 0; counter-reset: s; }
+.steps li { counter-increment: s; position: relative; padding: 2.2mm 0 2.2mm 9mm; border-bottom: 1px solid #EFEFEC; }
+.steps li:last-child { border-bottom: 0; }
+.steps li::before { content: counter(s); position: absolute; left: 0; top: 2.2mm; width: 5mm; height: 5mm; border: 1px solid #C9C9C4; border-radius: 50%; font-size: 7pt; line-height: 5mm; text-align: center; color: #3F3F46; font-weight: 500; }
+
+/* findings */
+.finding { padding: 4mm 0; border-bottom: 1px solid #E4E4E0; break-inside: avoid; page-break-inside: avoid; }
+.finding:first-of-type { padding-top: 0; }
+.finding-head { display: flex; align-items: baseline; gap: 4mm; }
+.finding-id { font-size: 7.5pt; color: #8A8A93; min-width: 9mm; font-variant-numeric: tabular-nums; }
+.finding-title { flex: 1; font-weight: 600; font-size: 10pt; }
+.finding-cvss { font-size: 7.5pt; color: #3F3F46; border: 1px solid #D4D4D0; border-radius: 1mm; padding: 0.3mm 1.6mm; white-space: nowrap; }
+.finding-meta { margin: 1mm 0 0 13mm; font-size: 8pt; color: #6B6B73; }
+.finding-body { margin: 2.5mm 0 0 13mm; }
+.finding-body .lbl { font-size: 7.5pt; color: #6B6B73; margin: 2.5mm 0 0.8mm; }
+.finding-body .lbl:first-child { margin-top: 0; }
+.evidence { font-family: "JetBrains Mono", Menlo, Consolas, "Courier New", monospace; font-size: 7.5pt; background: #F7F7F5; border: 1px solid #E4E4E0; border-radius: 1.5mm; padding: 2.5mm 3mm; white-space: pre-wrap; word-break: break-all; color: #2E2E33; }
+
+/* compliance */
+.fw { border: 1px solid #E4E4E0; border-radius: 2mm; margin-bottom: 4mm; break-inside: avoid; page-break-inside: avoid; }
+.fw-head { display: flex; align-items: center; gap: 4mm; padding: 3.5mm 4mm; border-bottom: 1px solid #E4E4E0; }
+.fw-grade { width: 9mm; height: 9mm; border-radius: 1.5mm; border: 1px solid #1A1A1E; font-weight: 600; font-size: 11pt; line-height: 9mm; text-align: center; flex: none; }
+.fw-name { font-weight: 600; }
+.fw-sub { font-size: 7.5pt; color: #6B6B73; }
+.fw-score { margin-left: auto; font-size: 13pt; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fw-score small { font-size: 8pt; color: #6B6B73; font-weight: 400; }
+.fw-stmt { padding: 2.5mm 4mm 0; font-size: 8pt; color: #3F3F46; }
+.fw table { margin: 1mm 0 0; }
+.fw td, .fw th { padding-top: 1.6mm; padding-bottom: 1.6mm; }
+.fw td:first-child, .fw th:first-child { padding-left: 4mm; }
+.fw td:last-child, .fw th:last-child { padding-right: 4mm; }
+.fw tr:last-child td { border-bottom: 0; }
+.bar { height: 1.6mm; background: #EFEFEC; border-radius: 1mm; overflow: hidden; }
+.bar span { display: block; height: 100%; }
+
+/* attack path */
+.ap { border: 1px solid #E4E4E0; border-radius: 2mm; padding: 4mm 5mm; margin-bottom: 4mm; break-inside: avoid; page-break-inside: avoid; }
+.ap-head { display: flex; align-items: baseline; gap: 4mm; margin-bottom: 2.5mm; }
+.ap-title { flex: 1; font-weight: 600; font-size: 10pt; }
+.ap-meta { font-size: 8pt; color: #6B6B73; margin-bottom: 2mm; }
+.ap .steps li { padding-top: 1.5mm; padding-bottom: 1.5mm; }
+.ap .steps li::before { top: 1.5mm; }
+.ap-foot { margin-top: 2.5mm; font-size: 8.5pt; }
+.ap-foot b { font-weight: 600; }
+
+/* priorities */
+.prio { display: flex; gap: 4mm; padding: 3.5mm 0; border-bottom: 1px solid #EFEFEC; break-inside: avoid; page-break-inside: avoid; }
+.prio-n { flex: none; width: 6mm; height: 6mm; border-radius: 50%; background: #1A1A1E; color: #fff; font-size: 8pt; font-weight: 600; line-height: 6mm; text-align: center; }
+.prio-a { font-weight: 600; }
+.prio-r { font-size: 8.5pt; color: #3F3F46; margin-top: 0.8mm; }
+.prio-m { font-size: 7.5pt; color: #6B6B73; margin-top: 1.2mm; }
+
+/* two columns (flex for WeasyPrint) */
+.cols { display: flex; gap: 6mm; }
+.cols > div { flex: 1; min-width: 0; }
+@media screen and (max-width: 820px) { .cols, .stats { flex-direction: column; } .stat + .stat { border-left: 0; border-top: 1px solid #E4E4E0; } .section-desc { display: none; } }
+
+.legal { margin-top: 8mm; padding-top: 4mm; border-top: 1px solid #E4E4E0; font-size: 7.5pt; color: #8A8A93; }
 </style>
 </head>
 <body>
 
-{# ================================================================
-   COVER PAGE
-   ================================================================ #}
-<div class="cover">
-  <div class="cover-brand">SuturaSec</div>
-  <div class="cover-brand-sub">Security as a Service</div>
-  <div class="cover-rep-title">Rapport de Sécurité</div>
-  <div class="cover-rep-type">{{ scan_type_label | upper }}</div>
-  <div class="cover-divider"></div>
-  <div class="cover-target">{{ scan.target }}</div>
-  <div class="cover-meta-line">Type : {{ scan_type_label }}</div>
-  <div class="cover-meta-line">Réalisé le : {{ scan.completed_at | fmt_date }}</div>
-  <div class="cover-meta-line">Rapport généré le : {{ generated_at }}</div>
+{# ----------------------------------------------------------------- helpers #}
+{% set SEV_ORDER = ['critical', 'high', 'medium', 'low', 'info'] %}
+{% set SEV_FR = {'critical': 'Critique', 'high': 'Élevée', 'medium': 'Moyenne', 'low': 'Faible', 'info': 'Info'} %}
+{% set ap_data = attack_paths or {} %}
+{% set rs = scan.risk_score %}
+{% if rs is none %}{% set rs_cls = 'c-info' %}
+{% elif rs >= 7 %}{% set rs_cls = 'c-critical' %}
+{% elif rs >= 6 %}{% set rs_cls = 'c-high' %}
+{% elif rs >= 4 %}{% set rs_cls = 'c-medium' %}
+{% else %}{% set rs_cls = 'c-ok' %}{% endif %}
+{% set sorted_vulns = [] %}
+{% for s in SEV_ORDER %}{% for v in vulnerabilities if v.severity == s %}{% set _ = sorted_vulns.append(v) %}{% endfor %}{% endfor %}
+{% for v in vulnerabilities if v.severity not in SEV_ORDER %}{% set _ = sorted_vulns.append(v) %}{% endfor %}
+{% set total_vulns = sorted_vulns | length %}
 
-  {% if scan.risk_score is not none %}
-  <div class="cover-risk-block">
-    <div class="cover-risk-lbl">Score de Risque Global</div>
-    <div class="cover-score-line">
-      <div class="cover-score-num
-        {%- if scan.risk_score >= 8 %} col-critical
-        {%- elif scan.risk_score >= 6 %} col-high
-        {%- elif scan.risk_score >= 4 %} col-medium
-        {%- else %} col-low{%- endif %}">{{ "%.1f"|format(scan.risk_score) }}</div>
-      <div class="cover-score-den">/ 10</div>
+{% set show_cti    = threat_intel and scan.scan_type == 'cti' %}
+{% set show_sub    = subdomain and scan.scan_type == 'subdomain' %}
+{% set show_api    = api and scan.scan_type == 'api' %}
+{% set show_osint  = osint and scan.scan_type == 'osint' %}
+{% set show_vulns  = total_vulns > 0 %}
+{% set show_comp   = compliance and scan.scan_type in ('web', 'network', 'authenticated_web') %}
+{% set show_ap     = ap_data.attack_paths %}
+{% set show_prio   = ap_data.top_priorities %}
+
+{% set toc = ['Résumé exécutif'] %}
+{% if show_cti %}{% set _ = toc.append('Threat Intelligence') %}{% endif %}
+{% if show_sub %}{% set _ = toc.append('Sous-domaines découverts') %}{% endif %}
+{% if show_api %}{% set _ = toc.append('Sécurité API') %}{% endif %}
+{% if show_osint %}{% set _ = toc.append('Reconnaissance OSINT') %}{% endif %}
+{% if show_vulns %}{% set _ = toc.append('Vulnérabilités détectées') %}{% endif %}
+{% if show_comp %}{% set _ = toc.append('Conformité') %}{% endif %}
+{% if show_ap %}{% set _ = toc.append("Scénarios d'attaque") %}{% endif %}
+{% if show_prio %}{% set _ = toc.append('Plan de remédiation') %}{% endif %}
+{% set _ = toc.append('Méthodologie') %}
+{% set ns = namespace(n=0) %}
+
+{% macro section_head(title, desc='') -%}
+{% set ns.n = ns.n + 1 %}
+<div class="section-head">
+  <span class="section-num">{{ '%02d' | format(ns.n) }}</span>
+  <h2 class="section-title">{{ title }}</h2>
+  {% if desc %}<span class="section-desc">{{ desc }}</span>{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro sev_span(s) -%}
+<span class="sev c-{{ s }}">{{ SEV_FR[s] if s in SEV_FR else s }}</span>
+{%- endmacro %}
+
+{% macro http_tag(code) -%}
+{% if code is none %}<span class="muted">—</span>
+{% elif code < 300 %}<span class="tag ok mono">{{ code }}</span>
+{% elif code < 400 %}<span class="tag mono">{{ code }}</span>
+{% else %}<span class="tag warn mono">{{ code }}</span>{% endif %}
+{%- endmacro %}
+
+{% macro score_cls(v) -%}
+{%- if v is none -%}c-info{%- elif v >= 80 -%}c-ok{%- elif v >= 60 -%}c-medium{%- elif v >= 40 -%}c-high{%- else -%}c-critical{%- endif -%}
+{%- endmacro %}
+
+<div class="toolbar">
+  <span><b>Rapport de sécurité</b> <span class="muted">· {{ scan.target }}</span></span>
+  <button type="button" onclick="window.print()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/></svg>
+    Imprimer / PDF
+  </button>
+</div>
+
+{# =================================================================== COVER #}
+<div class="page cover-page">
+<section class="cover">
+  <div class="cover-top">
+    <span class="brand">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#1A1A1E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/></svg>
+      SuturaSec
+    </span>
+    <span class="label">Confidentiel</span>
+  </div>
+
+  <div class="cover-main">
+    <p class="cover-kicker">{{ scan_type_label }}</p>
+    <h1 class="cover-title">Rapport de sécurité</h1>
+    <p class="cover-target mono">{{ scan.target }}</p>
+
+    <div class="cover-meta">
+      <div><span>Date de l'analyse</span><span>{{ scan.completed_at | fmt_date }}</span></div>
+      <div><span>Lancée le</span><span>{{ scan.created_at | fmt_date }}</span></div>
+      <div><span>Rapport généré le</span><span>{{ generated_at }}</span></div>
+      <div><span>Référence</span><span class="mono">SCAN-{{ '%05d' | format(scan.id or 0) }}</span></div>
     </div>
-    <div class="cover-risk-lvl
-      {%- if scan.risk_score >= 8 %} col-critical
-      {%- elif scan.risk_score >= 6 %} col-high
-      {%- elif scan.risk_score >= 4 %} col-medium
-      {%- else %} col-low{%- endif %}">{{ risk_label }}</div>
-  </div>
-  {% endif %}
 
-  {% set total_sev = sev_counts.critical + sev_counts.high + sev_counts.medium + sev_counts.low %}
-  {% if total_sev > 0 %}
-  <div class="cover-stats-row">
-    {% if sev_counts.critical > 0 %}<div><div class="cover-stat-num col-critical">{{ sev_counts.critical }}</div><div class="cover-stat-lbl">Critique{{ 's' if sev_counts.critical > 1 }}</div></div>{% endif %}
-    {% if sev_counts.high > 0 %}<div><div class="cover-stat-num col-high">{{ sev_counts.high }}</div><div class="cover-stat-lbl">Élevé{{ 's' if sev_counts.high > 1 }}</div></div>{% endif %}
-    {% if sev_counts.medium > 0 %}<div><div class="cover-stat-num col-medium">{{ sev_counts.medium }}</div><div class="cover-stat-lbl">Moyen{{ 's' if sev_counts.medium > 1 }}</div></div>{% endif %}
-    {% if sev_counts.low > 0 %}<div><div class="cover-stat-num col-low">{{ sev_counts.low }}</div><div class="cover-stat-lbl">Faible{{ 's' if sev_counts.low > 1 }}</div></div>{% endif %}
+    <div class="cover-toc">
+      <p class="cover-kicker" style="margin-bottom:2mm">Sommaire</p>
+      <ol class="toc">
+        {% for t in toc %}<li><span>{{ '%02d' | format(loop.index) }}</span><span>{{ t }}</span></li>{% endfor %}
+      </ol>
+    </div>
   </div>
-  {% elif scan.scan_type == 'subdomain' and subdomain %}
-  <div class="cover-stats-row">
-    <div><div class="cover-stat-num" style="color:#a5b4fc">{{ subdomain.total_found }}</div><div class="cover-stat-lbl">Sous-domaines</div></div>
-    {% if subdomain.summary %}
-    <div><div class="cover-stat-num col-low">{{ subdomain.summary.active_http or 0 }}</div><div class="cover-stat-lbl">Actifs HTTP</div></div>
-    <div><div class="cover-stat-num {% if subdomain.summary.takeover_risks > 0 %}col-critical{% else %}col-low{% endif %}">{{ subdomain.summary.takeover_risks or 0 }}</div><div class="cover-stat-lbl">Takeover</div></div>
+
+  <div class="cover-scores">
+    <div class="cover-score">
+      <div class="k">Score de risque</div>
+      {% if rs is not none %}
+      <div class="v {{ rs_cls }}">{{ '%.1f' | format(rs) }} <small>/ 10</small></div>
+      <div class="s {{ rs_cls }}">{{ risk_label }}</div>
+      {% else %}<div class="v muted">—</div>{% endif %}
+    </div>
+    {% if show_sub %}
+    <div class="cover-score"><div class="k">Sous-domaines</div><div class="v">{{ subdomain.total_found or 0 }}</div><div class="s muted">{{ (subdomain.summary or {}).active_http or 0 }} actifs HTTP</div></div>
+    <div class="cover-score"><div class="k">Risques de takeover</div><div class="v {{ 'c-critical' if (subdomain.summary or {}).takeover_risks else 'c-ok' }}">{{ (subdomain.summary or {}).takeover_risks or 0 }}</div></div>
+    {% elif show_api %}
+    <div class="cover-score"><div class="k">Endpoints</div><div class="v">{{ api.total_endpoints or 0 }}</div><div class="s muted">découverts</div></div>
+    <div class="cover-score"><div class="k">Vulnérabilités</div><div class="v">{{ total_vulns }}</div><div class="s c-critical">{{ sev_counts.critical }} critique{{ 's' if sev_counts.critical > 1 }}</div></div>
+    {% elif show_osint %}
+    <div class="cover-score"><div class="k">Emails exposés</div><div class="v">{{ (osint.emails_found or []) | length }}</div></div>
+    <div class="cover-score"><div class="k">Fuites de données</div><div class="v {{ 'c-critical' if (osint.breach_data or {}).breaches_found else 'c-ok' }}">{{ (osint.breach_data or {}).breaches_found or 0 }}</div></div>
+    {% elif show_cti %}
+    <div class="cover-score"><div class="k">Score de menace</div><div class="v">{{ threat_intel.threat_score if threat_intel.threat_score is not none else '—' }} <small>/ 10</small></div></div>
+    <div class="cover-score"><div class="k">Listes DNSBL</div><div class="v {{ 'c-critical' if (threat_intel.blacklists or {}).listed else 'c-ok' }}">{{ (threat_intel.blacklists or {}).listed or 0 }} <small>/ {{ (threat_intel.blacklists or {}).checked or 0 }}</small></div></div>
+    {% else %}
+    <div class="cover-score"><div class="k">Vulnérabilités</div><div class="v">{{ total_vulns }}</div>
+      <div class="s">{% if sev_counts.critical %}<span class="c-critical">{{ sev_counts.critical }} critique{{ 's' if sev_counts.critical > 1 }}</span>{% endif %}{% if sev_counts.critical and sev_counts.high %} · {% endif %}{% if sev_counts.high %}<span class="c-high">{{ sev_counts.high }} élevée{{ 's' if sev_counts.high > 1 }}</span>{% endif %}</div></div>
+    {% if compliance %}
+    <div class="cover-score"><div class="k">Conformité</div><div class="v {{ score_cls(compliance.global_score) }}">{{ '%.0f' | format(compliance.global_score or 0) }} <small>/ 100</small></div><div class="s muted">Note {{ compliance.global_grade }}</div></div>
+    {% endif %}
     {% endif %}
   </div>
-  {% elif scan.scan_type == 'api' and api %}
-  <div class="cover-stats-row">
-    <div><div class="cover-stat-num" style="color:#fb923c">{{ api.total_endpoints }}</div><div class="cover-stat-lbl">Endpoints</div></div>
-    {% if sev_counts.critical > 0 %}<div><div class="cover-stat-num col-critical">{{ sev_counts.critical }}</div><div class="cover-stat-lbl">Critiques</div></div>{% endif %}
-    {% if sev_counts.high > 0 %}<div><div class="cover-stat-num col-high">{{ sev_counts.high }}</div><div class="cover-stat-lbl">Élevés</div></div>{% endif %}
-    <div><div class="cover-stat-num" style="color:{% if api.swagger_found %}#16a34a{% else %}#6b7280{% endif %}">{{ '✓' if api.swagger_found else '—' }}</div><div class="cover-stat-lbl">Swagger</div></div>
-  </div>
-  {% elif scan.scan_type == 'osint' and osint %}
-  <div class="cover-stats-row">
-    <div><div class="cover-stat-num" style="color:#22d3ee">{{ osint.emails_found | length if osint.emails_found else 0 }}</div><div class="cover-stat-lbl">Emails exposés</div></div>
-    {% if osint.breach_data and osint.breach_data.breaches_found > 0 %}<div><div class="cover-stat-num col-critical">{{ osint.breach_data.breaches_found }}</div><div class="cover-stat-lbl">Breaches</div></div>{% endif %}
-    {% if osint.open_ports %}<div><div class="cover-stat-num col-high">{{ osint.open_ports | length }}</div><div class="cover-stat-lbl">Ports ouverts</div></div>{% endif %}
-    <div><div class="cover-stat-num" style="color:{% if osint.github_exposure and osint.github_exposure.leaks_found > 0 %}#d97706{% else %}#16a34a{% endif %}">{{ osint.github_exposure.leaks_found if osint.github_exposure else 0 }}</div><div class="cover-stat-lbl">GitHub leaks</div></div>
-  </div>
-  {% endif %}
 
-  <div class="cover-footer">Document confidentiel — SuturaSec {{ generated_at[:4] }}</div>
+  <p class="cover-foot">Ce document contient des informations confidentielles destinées exclusivement à son destinataire. Toute diffusion sans autorisation est interdite.</p>
+</section>
 </div>
 
+{# =================================================================== BODY #}
+<div class="page">
 
-{# ================================================================
-   01 — RÉSUMÉ EXÉCUTIF
-   ================================================================ #}
-<div class="section">
-  <div class="section-header">
-    <div class="section-num">01</div>
-    <div>
-      <div class="section-title">Résumé Exécutif</div>
-      <div class="section-desc">Synthèse de l'analyse et principaux enseignements</div>
-    </div>
-  </div>
+  {# ---------- 01 Résumé exécutif ---------- #}
+  <section class="section">
+    {{ section_head('Résumé exécutif', "Synthèse de l'analyse") }}
 
-  <div class="no-break" style="margin-bottom:6mm;">
-    <table>
-      <tr><th style="width:38%">Paramètre</th><th>Valeur</th></tr>
-      <tr><td>Cible analysée</td><td><strong>{{ scan.target }}</strong></td></tr>
-      <tr><td>Type d'analyse</td><td>{{ scan_type_label }}</td></tr>
-      <tr><td>Date de lancement</td><td>{{ scan.created_at | fmt_date }}</td></tr>
-      <tr><td>Date de fin</td><td>{{ scan.completed_at | fmt_date }}</td></tr>
-      <tr>
-        <td>Score de risque</td>
-        <td>{% if scan.risk_score is not none %}<strong>{{ "%.1f"|format(scan.risk_score) }} / 10 — {{ risk_label }}</strong>{% else %}—{% endif %}</td>
-      </tr>
-      <tr>
-        <td>Vulnérabilités</td>
-        <td>{{ vulnerabilities|length }} au total
-          {%- if sev_counts.critical > 0 %} · <strong style="color:#dc2626">{{ sev_counts.critical }} critique{{ 's' if sev_counts.critical > 1 }}</strong>{%- endif %}
-          {%- if sev_counts.high > 0 %} · <strong style="color:#ea580c">{{ sev_counts.high }} élevé{{ 's' if sev_counts.high > 1 }}</strong>{%- endif %}
-          {%- if sev_counts.medium > 0 %} · {{ sev_counts.medium }} moyen{%- endif %}
-          {%- if sev_counts.low > 0 %} · {{ sev_counts.low }} faible{%- endif %}
-        </td>
-      </tr>
-      {% if compliance %}
-      <tr><td>Score de conformité</td><td><strong>{{ "%.0f"|format(compliance.global_score) }}/100 — Note {{ compliance.global_grade }}</strong></td></tr>
-      {% endif %}
-      {% if subdomain %}
-      <tr><td>Sous-domaines découverts</td><td><strong>{{ subdomain.total_found }}</strong> ({{ subdomain.summary.active_http or 0 }} actifs HTTP, {{ subdomain.summary.takeover_risks or 0 }} risques takeover)</td></tr>
-      {% endif %}
-    </table>
-  </div>
+    {% if scan.summary %}<p class="lead" style="margin-bottom:5mm">{{ scan.summary }}</p>{% endif %}
 
-  {% if scan.summary %}
-  <div class="sum-box no-break">
-    <div class="sum-box-lbl">Analyse IA — Résumé Exécutif</div>
-    <div class="sum-box-txt">{{ scan.summary }}</div>
-  </div>
-  {% endif %}
-
-  {% if attack_paths.risk_narrative %}
-  <div class="sum-box sum-box-warn no-break">
-    <div class="sum-box-lbl sum-lbl-warn">Analyse de Risque</div>
-    <div class="sum-box-txt">{{ attack_paths.risk_narrative }}</div>
-  </div>
-  {% endif %}
-
-  {% if attack_paths.quick_wins %}
-  <div class="no-break">
-    <h3>Actions Rapides (Quick Wins)</h3>
-    {% for win in attack_paths.quick_wins %}
-    <div class="qw-row"><div class="qw-num">{{ loop.index }}</div><div class="qw-text">{{ win }}</div></div>
-    {% endfor %}
-  </div>
-  {% endif %}
-</div>
-
-
-{# ================================================================
-   02 — VULNÉRABILITÉS
-   ================================================================ #}
-{% if vulnerabilities %}
-<div class="section">
-  <div class="section-header">
-    <div class="section-num">02</div>
-    <div>
-      <div class="section-title">Vulnérabilités Détectées</div>
-      <div class="section-desc">{{ vulnerabilities|length }} finding{{ 's' if vulnerabilities|length > 1 }} — classés par criticité décroissante</div>
-    </div>
-  </div>
-
-  <div class="stats-grid no-break">
-    <div class="stat-card card-critical"><div class="stat-label">Critique</div><div class="stat-value val-critical">{{ sev_counts.critical }}</div></div>
-    <div class="stat-card card-high"><div class="stat-label">Élevé</div><div class="stat-value val-high">{{ sev_counts.high }}</div></div>
-    <div class="stat-card card-medium"><div class="stat-label">Moyen</div><div class="stat-value val-medium">{{ sev_counts.medium }}</div></div>
-    <div class="stat-card card-low"><div class="stat-label">Faible</div><div class="stat-value val-low">{{ sev_counts.low }}</div></div>
-    <div class="stat-card card-total"><div class="stat-label">Total</div><div class="stat-value val-total">{{ vulnerabilities|length }}</div></div>
-  </div>
-
-  {% for vuln in vulnerabilities %}
-  <div class="vuln-card">
-    <div class="vuln-head vh-{{ vuln.severity }}">
-      <div class="vuln-badge b-{{ vuln.severity }}">{{ vuln.severity | sev_label }}</div>
-      <div class="vuln-title-area">
-        <div class="vuln-title">{{ vuln.title }}</div>
-        {% if vuln.category %}<div class="vuln-category">{{ vuln.category }}</div>{% endif %}
+    <div class="cols nb">
+      <div>
+        <table class="kv">
+          <tr><td>Cible analysée</td><td class="mono">{{ scan.target }}</td></tr>
+          <tr><td>Type d'analyse</td><td>{{ scan_type_label }}</td></tr>
+          <tr><td>Début</td><td>{{ scan.created_at | fmt_date }}</td></tr>
+          <tr><td>Fin</td><td>{{ scan.completed_at | fmt_date }}</td></tr>
+          <tr><td>Score de risque</td><td>{% if rs is not none %}<b class="{{ rs_cls }}">{{ '%.1f' | format(rs) }} / 10</b> · {{ risk_label }}{% else %}—{% endif %}</td></tr>
+          {% if compliance %}<tr><td>Conformité</td><td><b>{{ '%.0f' | format(compliance.global_score or 0) }} / 100</b> · note {{ compliance.global_grade }}</td></tr>{% endif %}
+          {% if subdomain %}<tr><td>Sous-domaines</td><td>{{ subdomain.total_found or 0 }} découverts · {{ (subdomain.summary or {}).takeover_risks or 0 }} risque(s) de takeover</td></tr>{% endif %}
+        </table>
       </div>
-      {% if vuln.cvss_score %}<div class="vuln-cvss">CVSS {{ "%.1f"|format(vuln.cvss_score) }}</div>{% endif %}
-    </div>
-    <div class="vuln-body">
-      {% if vuln.description %}<div class="vlbl">Description</div><div class="vtxt">{{ vuln.description }}</div>{% endif %}
-      {% if vuln.evidence %}<div class="vlbl">Preuve technique</div><div class="vevid">{{ vuln.evidence }}</div>{% endif %}
-      {% if vuln.remediation %}<div class="vlbl">Remédiation recommandée</div><div class="vremed">{{ vuln.remediation }}</div>{% endif %}
-    </div>
-  </div>
-  {% endfor %}
-</div>
-{% endif %}
-
-
-{# ================================================================
-   03 — CONFORMITÉ
-   ================================================================ #}
-{% if compliance and scan.scan_type in ('web', 'network') %}
-<div class="section">
-  <div class="section-header">
-    <div class="section-num">03</div>
-    <div>
-      <div class="section-title">Rapport de Conformité</div>
-      <div class="section-desc">OWASP Top 10 · PCI-DSS v4.0 · ISO/IEC 27001:2022 · RGPD Art.32</div>
-    </div>
-  </div>
-
-  <div class="no-break" style="margin-bottom:6mm;border:1pt solid #c7d2fe;border-radius:3mm;padding:5mm;background:#f0f4ff;">
-    <div style="display:flex;align-items:center;gap:6mm;">
-      <div style="text-align:center;flex-shrink:0;">
-        <div style="font-size:7pt;font-weight:bold;text-transform:uppercase;letter-spacing:1pt;color:#6366f1;margin-bottom:1mm;">Score Global</div>
-        <div style="font-size:40pt;font-weight:900;line-height:1;color:{{ compliance.global_score | score_color }};">{{ "%.0f"|format(compliance.global_score) }}</div>
-        <div style="font-size:11pt;color:#9ca3af;">/100</div>
-      </div>
-      <div style="flex-shrink:0;text-align:center;">
-        <div style="font-size:48pt;font-weight:900;line-height:1;color:{{ compliance.global_grade | grade_color }};">{{ compliance.global_grade }}</div>
-      </div>
-      <div style="flex:1;">
-        <div style="font-size:9pt;color:#374151;margin-bottom:3mm;">{{ compliance.summary }}</div>
-        <div style="display:flex;gap:3mm;flex-wrap:wrap;">
-          {% for fw in compliance.frameworks %}
-          <div style="text-align:center;background:white;border:1pt solid #e5e7eb;border-radius:2mm;padding:2mm 3mm;min-width:22mm;">
-            <div style="font-size:7pt;color:#9ca3af;margin-bottom:1mm;">{{ fw.framework }}</div>
-            <div style="font-size:12pt;font-weight:900;color:{{ fw.grade | grade_color }};">{{ fw.grade }}</div>
-            <div style="font-size:8pt;color:#6b7280;">{{ "%.0f"|format(fw.overall_score) }}/100</div>
-          </div>
-          {% endfor %}
+      <div>
+        <p class="muted" style="font-size:8pt">Vulnérabilités par sévérité</p>
+        <p style="font-size:16pt;font-weight:600" class="num">{{ total_vulns }}</p>
+        {% if total_vulns %}
+        <div class="dist">
+          {% for s in SEV_ORDER %}{% if sev_counts[s] %}<span class="bg-{{ s }}" style="width:{{ (sev_counts[s] / total_vulns * 100) | round(1) }}%"></span>{% endif %}{% endfor %}
         </div>
+        {% endif %}
+        <table>
+          {% for s in SEV_ORDER %}
+          <tr><td>{{ sev_span(s) }}</td><td class="r num">{{ sev_counts[s] or 0 }}</td></tr>
+          {% endfor %}
+        </table>
       </div>
     </div>
-  </div>
 
-  {% for fw in compliance.frameworks %}
-  <div class="fw-block no-break">
-    <div class="fw-header">
-      <div class="fw-grade-box" style="background:{{ fw.grade | grade_color }};">{{ fw.grade }}</div>
-      <div class="fw-meta">
-        <div class="fw-name">{{ fw.framework }} {{ fw.version }}</div>
-        <div class="fw-ver">{{ fw.passed }} conformes · {{ fw.failed }} non-conformes{% if fw.partial > 0 %} · {{ fw.partial }} partiels{% endif %}</div>
-        <div class="fw-stmt">{{ fw.compliance_statement }}</div>
-      </div>
-      <div class="fw-score" style="color:{{ fw.overall_score | score_color }};">{{ "%.0f"|format(fw.overall_score) }}/100</div>
+    {% if ap_data.risk_narrative %}
+    <div class="callout warn nb" style="margin-top:5mm">
+      <p class="k">Analyse de risque</p>
+      <p>{{ ap_data.risk_narrative }}</p>
     </div>
-    {% for ctrl in fw.controls %}
-    <div class="fw-ctrl-row">
-      <div class="dot dot-{{ ctrl.status }}"></div>
-      <div class="ctrl-id">{{ ctrl.id }}</div>
-      <div class="ctrl-title">{{ ctrl.title }}</div>
-      <div class="ctrl-lbl lbl-{{ ctrl.status }}">{{ {'pass':'CONFORME','fail':'NON CONF.','partial':'PARTIEL','na':'N/A'}[ctrl.status] or ctrl.status }}</div>
-      <div class="ctrl-score" style="color:{{ ctrl.score | score_color }};">{{ ctrl.score }}%</div>
+    {% endif %}
+
+    {% if ap_data.quick_wins %}
+    <div class="nb">
+      <h3>Actions rapides</h3>
+      <ol class="steps">{% for w in ap_data.quick_wins %}<li>{{ w }}</li>{% endfor %}</ol>
     </div>
-    {% endfor %}
-  </div>
-  {% endfor %}
-</div>
-{% endif %}
+    {% endif %}
+  </section>
 
-
-{# ================================================================
-   THREAT INTELLIGENCE (CTI)
-   ================================================================ #}
-{% if threat_intel and scan.scan_type == 'cti' %}
-{% set ti_sec = '03' if not (compliance and scan.scan_type in ('web','network')) else '04' %}
-<div class="section">
-  <div class="section-header">
-    <div class="section-num">{{ ti_sec }}</div>
-    <div>
-      <div class="section-title">Threat Intelligence</div>
-      <div class="section-desc">Réputation IP · Géolocalisation · DNSBL · Domain RDAP</div>
-    </div>
-  </div>
-
+  {# ---------- Threat Intelligence ---------- #}
+  {% if show_cti %}
   {% set tl = threat_intel %}
-  <div class="callout {% if tl.risk_level in ('critical','high') %}callout-err{% elif tl.risk_level == 'medium' %}callout-warn{% else %}callout-ok{% endif %} no-break" style="margin-bottom:5mm;">
-    <div style="display:flex;align-items:center;gap:5mm;">
-      <div style="text-align:center;flex-shrink:0;">
-        <div style="font-size:7pt;font-weight:bold;text-transform:uppercase;letter-spacing:1pt;color:#6b7280;margin-bottom:1mm;">Score de Menace</div>
-        <div style="font-size:32pt;font-weight:900;line-height:1;
-          {%- if tl.risk_level == 'critical' %}color:#dc2626;{%- elif tl.risk_level == 'high' %}color:#ea580c;{%- elif tl.risk_level == 'medium' %}color:#d97706;{%- else %}color:#16a34a;{%- endif %}">{{ tl.threat_score }}</div>
-        <div style="font-size:9pt;color:#9ca3af;">/10</div>
-      </div>
-      <div style="flex:1;">
-        <div style="font-size:11pt;font-weight:bold;margin-bottom:1mm;">Niveau : {{ {'critical':'Critique','high':'Élevé','medium':'Moyen','low':'Faible','info':'Info'}[tl.risk_level] or tl.risk_level }}</div>
-        <div style="font-size:8.5pt;color:#6b7280;">Domaine : <strong>{{ tl.domain }}</strong> · IP : <strong>{{ tl.ip or '—' }}</strong></div>
-      </div>
+  {% set geo = tl.geolocation or {} %}
+  <section class="section np">
+    {{ section_head('Threat Intelligence', 'Réputation IP · Géolocalisation · DNSBL · RDAP') }}
+    <div class="stats nb">
+      <div class="stat"><p class="k">Score de menace</p><p class="v c-{{ tl.risk_level or 'info' }}">{{ tl.threat_score if tl.threat_score is not none else '—' }}<span class="muted" style="font-size:9pt;font-weight:400"> / 10</span></p><p class="s">{{ SEV_FR[tl.risk_level] if tl.risk_level in SEV_FR else (tl.risk_level or '—') }}</p></div>
+      <div class="stat"><p class="k">Domaine</p><p class="v sm mono">{{ tl.domain or '—' }}</p></div>
+      <div class="stat"><p class="k">Adresse IP</p><p class="v sm mono">{{ tl.ip or '—' }}</p></div>
+      {% if tl.blacklists %}<div class="stat"><p class="k">Listes DNSBL</p><p class="v {{ 'c-critical' if tl.blacklists.listed else 'c-ok' }}">{{ tl.blacklists.listed or 0 }}<span class="muted" style="font-size:9pt;font-weight:400"> / {{ tl.blacklists.checked or 0 }}</span></p></div>{% endif %}
     </div>
-  </div>
 
-  {% if tl.geolocation %}
-  <h3>Géolocalisation &amp; ASN</h3>
-  <div class="cti-grid no-break">
-    <div class="cti-card"><div class="cti-card-title">Pays</div><div class="cti-value">{{ tl.geolocation.country or '—' }}</div><div class="cti-sub">{{ tl.geolocation.country_code or '' }}</div></div>
-    <div class="cti-card"><div class="cti-card-title">Ville / Région</div><div class="cti-value">{{ tl.geolocation.city or '—' }}</div><div class="cti-sub">{{ tl.geolocation.region or '' }}</div></div>
-    <div class="cti-card"><div class="cti-card-title">ISP / ASN</div><div class="cti-value" style="font-size:8.5pt;">{{ tl.geolocation.isp or '—' }}</div><div class="cti-sub">{{ tl.geolocation.asn or '' }}</div></div>
-    <div class="cti-card"><div class="cti-card-title">Datacenter</div><div class="cti-value {% if tl.geolocation.is_hosting %}col-high{% else %}col-low{% endif %}">{{ 'Oui' if tl.geolocation.is_hosting else 'Non' }}</div></div>
-  </div>
-  {% endif %}
-
-  {% if tl.domain_info %}
-  <h3>Informations domaine (RDAP)</h3>
-  <div class="no-break">
-    {% if tl.domain_info.registrar %}<div class="info-row"><span class="ir-key">Registrar</span><span class="ir-val">{{ tl.domain_info.registrar }}</span></div>{% endif %}
-    {% if tl.domain_info.creation_date %}<div class="info-row"><span class="ir-key">Créé le</span><span class="ir-val">{{ tl.domain_info.creation_date }}</span></div>{% endif %}
-    {% if tl.domain_info.expiry_date %}<div class="info-row"><span class="ir-key">Expire le</span><span class="ir-val">{{ tl.domain_info.expiry_date }}</span></div>{% endif %}
-    {% if tl.domain_info.age_days is defined %}<div class="info-row"><span class="ir-key">Âge du domaine</span><span class="ir-val">{{ tl.domain_info.age_days }} jours</span></div>{% endif %}
-  </div>
-  {% endif %}
-
-  {% if tl.blacklists and tl.blacklists.hits %}
-  <h3>Blacklists DNSBL — {{ tl.blacklists.listed }} / {{ tl.blacklists.checked }} listes positives</h3>
-  <div class="no-break">
-    <table>
-      <tr><th>Liste DNSBL</th><th style="width:25%">Statut</th></tr>
-      {% for hit in tl.blacklists.hits %}
-      <tr>
-        <td>{{ hit.name }}</td>
-        <td>{% if hit.listed %}<span class="dnsbl-hit">BLACKLISTÉ</span>{% else %}<span class="dnsbl-clean">Propre</span>{% endif %}</td>
-      </tr>
-      {% endfor %}
-    </table>
-  </div>
-  {% endif %}
-
-  {% if tl.abuse and tl.abuse.confidence_score is defined %}
-  <h3>AbuseIPDB</h3>
-  <div class="no-break">
-    <div class="info-row"><span class="ir-key">Score d'abus</span><span class="ir-val">{{ tl.abuse.confidence_score }}%</span></div>
-    <div class="info-row"><span class="ir-key">Signalements</span><span class="ir-val">{{ tl.abuse.total_reports }}</span></div>
-    {% if tl.abuse.last_reported %}<div class="info-row"><span class="ir-key">Dernier rapport</span><span class="ir-val">{{ tl.abuse.last_reported }}</span></div>{% endif %}
-    {% if tl.abuse.is_tor %}<div class="info-row"><span class="ir-key">Nœud Tor</span><span class="ir-val col-high">Oui</span></div>{% endif %}
-  </div>
-  {% endif %}
-
-  {% if tl.dns_records %}
-  <h3>Enregistrements DNS</h3>
-  <div class="no-break">
-    <table>
-      <tr><th style="width:12%">Type</th><th>Valeur(s)</th></tr>
-      {% for rtype, rvals in tl.dns_records.items() %}
-      <tr><td><strong>{{ rtype }}</strong></td><td style="font-family:'Courier New',monospace;font-size:8.5pt;">{{ rvals | join(', ') }}</td></tr>
-      {% endfor %}
-    </table>
-  </div>
-  {% endif %}
-</div>
-{% endif %}
-
-
-{# ================================================================
-   SUBDOMAIN ENUMERATION
-   ================================================================ #}
-{% if subdomain and scan.scan_type == 'subdomain' %}
-<div class="section">
-  <div class="section-header">
-    <div class="section-num">03</div>
-    <div>
-      <div class="section-title">Sous-domaines Découverts</div>
-      <div class="section-desc">Énumération multi-sources : crt.sh · HackerTarget · Brute-force · DNS records</div>
+    <div class="cols">
+      {% if tl.geolocation %}
+      <div class="nb"><h3>Géolocalisation et ASN</h3>
+        <table class="kv">
+          <tr><td>Pays</td><td>{{ geo.country or '—' }} {% if geo.country_code %}<span class="muted">({{ geo.country_code }})</span>{% endif %}</td></tr>
+          <tr><td>Ville / Région</td><td>{{ geo.city or '—' }}{% if geo.region %}, {{ geo.region }}{% endif %}</td></tr>
+          <tr><td>ISP / Org</td><td>{{ geo.isp or geo.org or '—' }}</td></tr>
+          <tr><td>ASN</td><td class="mono">{{ geo.asn or '—' }}</td></tr>
+          {% if geo.timezone %}<tr><td>Fuseau horaire</td><td>{{ geo.timezone }}</td></tr>{% endif %}
+          <tr><td>Datacenter / Hosting</td><td>{{ 'Oui' if geo.is_hosting else 'Non' }}</td></tr>
+        </table></div>
+      {% endif %}
+      {% if tl.domain_info %}
+      <div class="nb"><h3>Domaine (RDAP)</h3>
+        <table class="kv">
+          {% if tl.domain_info.registrar %}<tr><td>Registrar</td><td>{{ tl.domain_info.registrar }}</td></tr>{% endif %}
+          {% if tl.domain_info.creation_date %}<tr><td>Création</td><td>{{ tl.domain_info.creation_date }}</td></tr>{% endif %}
+          {% if tl.domain_info.expiry_date %}<tr><td>Expiration</td><td>{{ tl.domain_info.expiry_date }}</td></tr>{% endif %}
+          {% if tl.domain_info.age_days is defined and tl.domain_info.age_days is not none %}<tr><td>Âge du domaine</td><td>{{ tl.domain_info.age_days }} jours</td></tr>{% endif %}
+        </table></div>
+      {% endif %}
     </div>
-  </div>
 
-  <div class="stats-grid no-break">
-    <div class="stat-card card-violet"><div class="stat-label">Total trouvés</div><div class="stat-value val-violet">{{ subdomain.total_found }}</div></div>
-    {% if subdomain.summary %}
-    <div class="stat-card card-green"><div class="stat-label">Actifs HTTP</div><div class="stat-value val-green">{{ subdomain.summary.active_http or 0 }}</div></div>
-    <div class="stat-card {% if subdomain.summary.takeover_risks > 0 %}card-critical{% endif %}"><div class="stat-label">Takeover Risks</div><div class="stat-value {% if subdomain.summary.takeover_risks > 0 %}val-critical{% else %}val-green{% endif %}">{{ subdomain.summary.takeover_risks or 0 }}</div></div>
-    <div class="stat-card {% if subdomain.summary.dev_exposed > 0 %}card-medium{% endif %}"><div class="stat-label">Dev Exposés</div><div class="stat-value {% if subdomain.summary.dev_exposed > 0 %}val-medium{% else %}val-green{% endif %}">{{ subdomain.summary.dev_exposed or 0 }}</div></div>
+    <div class="cols">
+      {% if tl.abuse and tl.abuse.confidence_score is defined %}
+      <div class="nb"><h3>AbuseIPDB</h3>
+        <table class="kv">
+          <tr><td>Score d'abus</td><td>{{ tl.abuse.confidence_score }} %</td></tr>
+          <tr><td>Signalements</td><td>{{ tl.abuse.total_reports or 0 }}</td></tr>
+          {% if tl.abuse.last_reported %}<tr><td>Dernier signalement</td><td>{{ tl.abuse.last_reported }}</td></tr>{% endif %}
+          {% if tl.abuse.usage_type %}<tr><td>Type d'usage</td><td>{{ tl.abuse.usage_type }}</td></tr>{% endif %}
+          <tr><td>Nœud Tor</td><td>{{ 'Oui' if tl.abuse.is_tor else 'Non' }}</td></tr>
+        </table></div>
+      {% endif %}
+      {% if tl.blacklists and tl.blacklists.hits %}
+      <div class="nb"><h3>Listes de blocage DNSBL</h3>
+        <table>
+          {% for hit in tl.blacklists.hits %}
+          <tr><td class="mono">{{ hit.name }}</td><td class="r">{% if hit.listed %}<span class="tag fail">Listée</span>{% else %}<span class="tag ok">Propre</span>{% endif %}</td></tr>
+          {% endfor %}
+        </table></div>
+      {% endif %}
+    </div>
+
+    {% if tl.dns_records %}
+    <div class="nb"><h3>Enregistrements DNS</h3>
+      <table>
+        <tr><th style="width:14%">Type</th><th>Valeur(s)</th></tr>
+        {% for rtype, rvals in tl.dns_records.items() %}
+        <tr><td class="mono">{{ rtype }}</td><td class="mono">{{ rvals | join(', ') if rvals is not string else rvals }}</td></tr>
+        {% endfor %}
+      </table></div>
     {% endif %}
-    <div class="stat-card {% if subdomain.zone_transfer_vulnerable %}card-critical{% else %}card-green{% endif %}"><div class="stat-label">Zone Transfer</div><div class="stat-value" style="font-size:12pt;padding-top:4mm;{% if subdomain.zone_transfer_vulnerable %}color:#dc2626;{% else %}color:#16a34a;{% endif %}">{{ 'VULN.' if subdomain.zone_transfer_vulnerable else 'Sécurisé' }}</div></div>
-  </div>
+  </section>
+  {% endif %}
 
-  <div style="margin-bottom:5mm;font-size:8.5pt;color:#6b7280;">
-    Sources : <strong>crt.sh {{ subdomain.sources.crtsh or 0 }}</strong> · <strong>HackerTarget {{ subdomain.sources.hackertarget or 0 }}</strong> · <strong>Brute-force {{ subdomain.sources.bruteforce or 0 }}</strong> · <strong>DNS {{ subdomain.sources.dns_records or 0 }}</strong>
-    {% if subdomain.wildcard_detected %} · <strong style="color:#d97706;">Wildcard DNS détecté → {{ subdomain.wildcard_ips | join(', ') }}</strong>{% endif %}
-  </div>
+  {# ---------- Sous-domaines ---------- #}
+  {% if show_sub %}
+  {% set sm = subdomain.summary or {} %}
+  {% set src = subdomain.sources or {} %}
+  {% set subs = subdomain.subdomains or [] %}
+  <section class="section np">
+    {{ section_head('Sous-domaines découverts', 'crt.sh · HackerTarget · Brute-force · DNS') }}
+    <div class="stats nb">
+      <div class="stat"><p class="k">Trouvés</p><p class="v">{{ subdomain.total_found or 0 }}</p></div>
+      <div class="stat"><p class="k">Actifs HTTP</p><p class="v">{{ sm.active_http or 0 }}</p></div>
+      <div class="stat"><p class="k">Takeover</p><p class="v {{ 'c-critical' if sm.takeover_risks else 'c-ok' }}">{{ sm.takeover_risks or 0 }}</p></div>
+      <div class="stat"><p class="k">Dev exposés</p><p class="v {{ 'c-medium' if sm.dev_exposed else '' }}">{{ sm.dev_exposed or 0 }}</p></div>
+      <div class="stat"><p class="k">Zone transfer</p><p class="v sm {{ 'c-critical' if subdomain.zone_transfer_vulnerable else 'c-ok' }}">{{ 'Vulnérable' if subdomain.zone_transfer_vulnerable else 'Refusé' }}</p></div>
+    </div>
+    <p class="muted" style="font-size:8pt;margin-bottom:4mm">
+      Sources : crt.sh {{ src.crtsh or 0 }} · HackerTarget {{ src.hackertarget or 0 }} · Brute-force {{ src.bruteforce or 0 }} · DNS {{ src.dns_records or 0 }}
+      {% if subdomain.wildcard_detected %} · <b class="c-medium">DNS wildcard détecté → {{ (subdomain.wildcard_ips or []) | join(', ') }}</b>{% endif %}
+    </p>
 
-  {% set takeover_subs = subdomain.subdomains | selectattr('takeover_risk') | list %}
-  {% if takeover_subs %}
-  <h3 style="color:#dc2626;border-color:#fca5a5;">Risques Subdomain Takeover ({{ takeover_subs|length }})</h3>
-  <div class="no-break">
+    {% set takeover_subs = subs | selectattr('takeover_risk') | list %}
+    {% if takeover_subs %}
+    <div class="nb"><h3 class="c-critical">Risques de takeover ({{ takeover_subs | length }})</h3>
+      <table>
+        <tr><th>Sous-domaine</th><th>CNAME</th><th class="r">Service</th></tr>
+        {% for sub in takeover_subs %}
+        <tr><td class="mono">{{ sub.subdomain }}</td><td class="mono">{{ sub.cname or '—' }}</td><td class="r"><span class="tag fail">{{ sub.takeover_service or 'Inconnu' }}</span></td></tr>
+        {% endfor %}
+      </table></div>
+    {% endif %}
+
+    {% set active_subs = subs | selectattr('status_code') | list %}
+    {% if active_subs %}
+    <h3>Sous-domaines actifs ({{ active_subs | length }} / {{ subdomain.total_found or subs | length }})</h3>
     <table>
-      <tr><th>Sous-domaine</th><th>CNAME</th><th>Service</th></tr>
-      {% for sub in takeover_subs %}
+      <tr><th>Sous-domaine</th><th>HTTP</th><th>TLS</th><th>Titre</th><th class="r">Source</th></tr>
+      {% for sub in active_subs[:80] %}
       <tr>
-        <td style="font-family:'Courier New',monospace;font-size:8.5pt;">{{ sub.subdomain }}</td>
-        <td style="font-family:'Courier New',monospace;font-size:8pt;">{{ sub.cname or '—' }}</td>
-        <td><span class="to-badge">{{ sub.takeover_service or '?' }}</span></td>
+        <td class="mono">{{ sub.subdomain }}</td>
+        <td>{{ http_tag(sub.status_code) }}</td>
+        <td>{{ 'HTTPS' if sub.https else '—' }}</td>
+        <td>{{ (sub.title or '—') | truncate(48, true, '…') }}</td>
+        <td class="r muted">{{ {'crt.sh': 'crt.sh', 'crtsh': 'crt.sh', 'hackertarget': 'HackerTarget', 'bruteforce': 'Brute-force', 'dns_records': 'DNS'}.get(sub.source, sub.source or '—') }}</td>
       </tr>
       {% endfor %}
+      {% if active_subs | length > 80 %}<tr><td colspan="5" class="trunc">… {{ active_subs | length - 80 }} entrées supplémentaires non affichées</td></tr>{% endif %}
     </table>
-  </div>
-  {% endif %}
-
-  {% set active_subs = subdomain.subdomains | selectattr('status_code', 'ne', none) | list %}
-  {% if active_subs %}
-  <h3>Sous-domaines Actifs ({{ active_subs|length }} / {{ subdomain.total_found }})</h3>
-  <table>
-    <tr><th>Sous-domaine</th><th style="width:10%">HTTP</th><th style="width:22%">Titre</th><th style="width:14%">Source</th></tr>
-    {% for sub in active_subs[:80] %}
-    <tr>
-      <td style="font-family:'Courier New',monospace;font-size:8pt;">{{ sub.subdomain }}{% if sub.takeover_risk %} <span class="to-badge">TAKE.</span>{% endif %}</td>
-      <td class="{{ sub.status_code | status_class }}">{% if sub.https %}🔒 {% endif %}{{ sub.status_code }}</td>
-      <td style="font-size:8pt;">{{ (sub.title or '')[:45] }}{% if sub.title and sub.title|length > 45 %}…{% endif %}</td>
-      <td><span class="src-badge src-{{ sub.source }}">{{ {'crt.sh':'crt.sh','hackertarget':'HT','bruteforce':'brute','dns_records':'DNS'}[sub.source] or sub.source }}</span></td>
-    </tr>
-    {% endfor %}
-    {% if active_subs|length > 80 %}
-    <tr><td colspan="4" style="text-align:center;color:#9ca3af;font-style:italic;">… {{ active_subs|length - 80 }} entrées supplémentaires non affichées</td></tr>
     {% endif %}
-  </table>
-  {% endif %}
-</div>
-{% endif %}
-
-
-{# ================================================================
-   API SECURITY SECTION
-   ================================================================ #}
-{% if api and scan.scan_type == 'api' %}
-<div class="section">
-  <div class="section-header">
-    <div class="section-num">02</div>
-    <div>
-      <div class="section-title">API Security — OWASP API Top 10 (2023)</div>
-      <div class="section-desc">{{ api.total_endpoints }} endpoint(s) découverts · Durée : {{ api.scan_duration_seconds }}s</div>
-    </div>
-  </div>
-
-  <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:6mm;">
-    <div class="stat-card" style="border-color:#f97316;background:#fff7ed;">
-      <div class="stat-label">Endpoints</div>
-      <div class="stat-value" style="color:#ea580c;">{{ api.total_endpoints }}</div>
-    </div>
-    <div class="stat-card {% if sev_counts.critical > 0 %}card-critical{% endif %}">
-      <div class="stat-label">Critiques</div>
-      <div class="stat-value {% if sev_counts.critical > 0 %}val-critical{% else %}val-green{% endif %}">{{ sev_counts.critical }}</div>
-    </div>
-    <div class="stat-card {% if api.swagger_found %}card-green{% endif %}">
-      <div class="stat-label">Swagger/OpenAPI</div>
-      <div class="stat-value" style="font-size:10pt;padding-top:5mm;color:{% if api.swagger_found %}#16a34a{% else %}#6b7280{% endif %};">
-        {{ '✓ Trouvé' if api.swagger_found else '— Absent' }}
-      </div>
-    </div>
-    <div class="stat-card {% if api.graphql_found %}card-medium{% endif %}">
-      <div class="stat-label">GraphQL</div>
-      <div class="stat-value" style="font-size:10pt;padding-top:5mm;color:{% if api.graphql_found %}#d97706{% else %}#6b7280{% endif %};">
-        {{ '⚠ Détecté' if api.graphql_found else '— Absent' }}
-      </div>
-    </div>
-  </div>
-
-  {% if api.owasp_coverage %}
-  <p style="font-size:8.5pt;color:#6b7280;margin-bottom:3mm;"><strong>Couverture OWASP :</strong>
-  {% for cat in api.owasp_coverage %}<span style="display:inline-block;background:#fff7ed;border:1px solid #fed7aa;color:#ea580c;border-radius:4px;padding:1px 5px;margin:1px;font-size:7.5pt;font-weight:700;">{{ cat }}</span>{% endfor %}
-  </p>
+  </section>
   {% endif %}
 
-  {% if api.endpoints_found %}
-  <h3 style="font-size:10pt;font-weight:700;color:#1e293b;margin:4mm 0 2mm;">Endpoints découverts</h3>
-  <table style="width:100%;border-collapse:collapse;font-size:8pt;">
-    <thead>
-      <tr style="background:#f8fafc;">
-        <th style="padding:3mm 2mm;text-align:left;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:7.5pt;text-transform:uppercase;">Méthode</th>
-        <th style="padding:3mm 2mm;text-align:left;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:7.5pt;text-transform:uppercase;">Path</th>
-        <th style="padding:3mm 2mm;text-align:center;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:7.5pt;text-transform:uppercase;">Status</th>
-        <th style="padding:3mm 2mm;text-align:right;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:7.5pt;text-transform:uppercase;">Latence</th>
-      </tr>
-    </thead>
-    <tbody>
+  {# ---------- API ---------- #}
+  {% if show_api %}
+  <section class="section np">
+    {{ section_head('Sécurité API', 'OWASP API Security Top 10 (2023)') }}
+    <div class="stats nb">
+      <div class="stat"><p class="k">Endpoints</p><p class="v">{{ api.total_endpoints or 0 }}</p><p class="s">découverts</p></div>
+      <div class="stat"><p class="k">Critiques</p><p class="v {{ 'c-critical' if sev_counts.critical else 'c-ok' }}">{{ sev_counts.critical }}</p></div>
+      <div class="stat"><p class="k">Swagger / OpenAPI</p><p class="v sm">{{ 'Trouvé' if api.swagger_found else 'Absent' }}</p>{% if api.swagger_url %}<p class="s mono">{{ api.swagger_url }}</p>{% endif %}</div>
+      <div class="stat"><p class="k">GraphQL</p><p class="v sm {{ 'c-medium' if api.graphql_found else '' }}">{{ 'Détecté' if api.graphql_found else 'Absent' }}</p></div>
+      {% if api.scan_duration_seconds %}<div class="stat"><p class="k">Durée</p><p class="v sm">{{ api.scan_duration_seconds }} s</p></div>{% endif %}
+    </div>
+
+    {% if api.owasp_coverage %}
+    <div class="nb" style="margin-bottom:4mm">
+      <p class="muted" style="font-size:8pt;margin-bottom:1.5mm">Catégories OWASP API concernées</p>
+      {% for cat in api.owasp_coverage %}<span class="tag fail">{{ cat }}</span>{% endfor %}
+    </div>
+    {% endif %}
+
+    {% if api.endpoints_found %}
+    <h3>Endpoints découverts</h3>
+    <table>
+      <tr><th style="width:12%">Méthode</th><th>Chemin</th><th style="width:12%">Statut</th><th class="r" style="width:14%">Latence</th></tr>
       {% for ep in api.endpoints_found[:50] %}
-      <tr style="border-bottom:1px solid #f1f5f9;">
-        <td style="padding:2mm;font-family:monospace;font-size:7.5pt;color:#ea580c;font-weight:700;">GET</td>
-        <td style="padding:2mm;font-family:monospace;font-size:8pt;color:#1e293b;">{{ ep.path }}</td>
-        <td style="padding:2mm;text-align:center;">
-          <span style="padding:1px 5px;border-radius:3px;font-size:7.5pt;font-weight:700;
-            {% if ep.status_code and ep.status_code < 300 %}background:#dcfce7;color:#166534;
-            {% elif ep.status_code and ep.status_code < 400 %}background:#fef9c3;color:#854d0e;
-            {% else %}background:#fee2e2;color:#991b1b;{% endif %}">
-            {{ ep.status_code or '—' }}
-          </span>
-        </td>
-        <td style="padding:2mm;text-align:right;font-size:7.5pt;color:#6b7280;">{{ ep.response_time_ms or '—' }}ms</td>
+      <tr>
+        <td class="mono">{{ ep.method or 'GET' }}</td>
+        <td class="mono">{{ ep.path or ep.url }}</td>
+        <td>{{ http_tag(ep.status_code) }}</td>
+        <td class="r num">{{ ep.response_time_ms ~ ' ms' if ep.response_time_ms is not none else '—' }}</td>
       </tr>
       {% endfor %}
-    </tbody>
-  </table>
-  {% if api.endpoints_found | length > 50 %}
-  <p style="font-size:7.5pt;color:#6b7280;margin-top:2mm;">... et {{ (api.endpoints_found | length) - 50 }} endpoint(s) supplémentaires.</p>
+      {% if api.endpoints_found | length > 50 %}<tr><td colspan="4" class="trunc">… {{ api.endpoints_found | length - 50 }} endpoint(s) supplémentaire(s)</td></tr>{% endif %}
+    </table>
+    {% endif %}
+  </section>
   {% endif %}
-  {% endif %}
-</div>
-{% endif %}
 
+  {# ---------- OSINT ---------- #}
+  {% if show_osint %}
+  {% set wh = osint.whois or {} %}
+  {% set ssl = osint.ssl_cert or {} %}
+  {% set asn = osint.asn_info or {} %}
+  {% set tech = osint.technologies or {} %}
+  {% set br = osint.breach_data or {} %}
+  {% set gh = osint.github_exposure or {} %}
+  <section class="section np">
+    {{ section_head('Reconnaissance OSINT', (osint.sources_queried or []) | length ~ ' sources interrogées') }}
+    <div class="stats nb">
+      <div class="stat"><p class="k">Emails exposés</p><p class="v">{{ (osint.emails_found or []) | length }}</p></div>
+      <div class="stat"><p class="k">Fuites de données</p><p class="v {{ 'c-critical' if br.breaches_found else 'c-ok' }}">{{ br.breaches_found or 0 }}</p></div>
+      <div class="stat"><p class="k">Exposition GitHub</p><p class="v {{ 'c-medium' if gh.leaks_found else 'c-ok' }}">{{ gh.leaks_found or 0 }}</p><p class="s">résultats sensibles</p></div>
+      <div class="stat"><p class="k">Ports ouverts</p><p class="v {{ 'c-high' if osint.open_ports else 'c-ok' }}">{{ (osint.open_ports or []) | length }}</p></div>
+    </div>
 
-{# ================================================================
-   OSINT RECON SECTION
-   ================================================================ #}
-{% if osint and scan.scan_type == 'osint' %}
-<div class="section">
-  <div class="section-header">
-    <div class="section-num">02</div>
-    <div>
-      <div class="section-title">OSINT Recon — Renseignement Open-Source</div>
-      <div class="section-desc">{{ osint.domain }} · {{ osint.sources_queried | length }} sources interrogées · {{ osint.scan_duration_seconds }}s</div>
+    <div class="cols">
+      <div class="nb"><h3>Infrastructure</h3>
+        <table class="kv">
+          <tr><td>Adresses IP</td><td class="mono">{{ (osint.ip_addresses or ['—']) | join(', ') }}</td></tr>
+          <tr><td>ASN</td><td class="mono">{{ asn.asn or '—' }}</td></tr>
+          <tr><td>Organisation</td><td>{{ asn.org or '—' }}</td></tr>
+          <tr><td>Pays</td><td>{{ asn.country or (osint.geo_info or {}).country or '—' }}</td></tr>
+        </table></div>
+      {% if osint.whois %}
+      <div class="nb"><h3>WHOIS</h3>
+        <table class="kv">
+          {% if wh.registrar %}<tr><td>Registrar</td><td>{{ wh.registrar }}</td></tr>{% endif %}
+          {% if wh.registrant_org %}<tr><td>Organisation</td><td>{{ wh.registrant_org }}</td></tr>{% endif %}
+          {% if wh.created %}<tr><td>Création</td><td>{{ wh.created[:10] }}</td></tr>{% endif %}
+          {% if wh.expires %}<tr><td>Expiration</td><td>{{ wh.expires[:10] }}</td></tr>{% endif %}
+        </table></div>
+      {% endif %}
     </div>
-  </div>
 
-  <!-- Infrastructure -->
-  <div class="cti-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:5mm;">
-    <div class="cti-card">
-      <div class="cti-card-title">Adresses IP</div>
-      {% for ip in (osint.ip_addresses or []) %}<div style="font-family:monospace;font-size:8.5pt;color:#1e293b;">{{ ip }}</div>{% endfor %}
-      {% if not osint.ip_addresses %}<div style="color:#6b7280;font-size:8.5pt;">—</div>{% endif %}
+    <div class="cols">
+      {% if osint.ssl_cert %}
+      <div class="nb"><h3>Certificat TLS</h3>
+        <table class="kv">
+          <tr><td>Sujet</td><td class="mono">{{ ssl.subject or '—' }}</td></tr>
+          <tr><td>Émetteur</td><td>{{ ssl.issuer or '—' }}</td></tr>
+          {% if ssl.not_after %}<tr><td>Expire le</td><td>{{ ssl.not_after[:10] }}</td></tr>{% endif %}
+          {% if ssl.days_remaining is not none %}<tr><td>Expire dans</td><td class="{{ 'c-critical' if ssl.days_remaining <= 30 else ('c-medium' if ssl.days_remaining <= 90 else 'c-ok') }}"><b>{{ ssl.days_remaining }} jours</b></td></tr>{% endif %}
+          <tr><td>Auto-signé</td><td>{{ 'Oui' if ssl.is_self_signed else 'Non' }}</td></tr>
+        </table></div>
+      {% endif %}
+      {% if tech.server or tech.cms or tech.frameworks or tech.powered_by %}
+      <div class="nb"><h3>Technologies détectées</h3>
+        <table class="kv">
+          {% if tech.server %}<tr><td>Serveur</td><td class="mono">{{ tech.server }}</td></tr>{% endif %}
+          {% if tech.powered_by %}<tr><td>X-Powered-By</td><td class="mono">{{ tech.powered_by }}</td></tr>{% endif %}
+          {% if tech.cms %}<tr><td>CMS</td><td>{{ tech.cms }}</td></tr>{% endif %}
+          {% if tech.frameworks %}<tr><td>Frameworks</td><td>{% for f in tech.frameworks %}<span class="tag">{{ f }}</span>{% endfor %}</td></tr>{% endif %}
+        </table></div>
+      {% endif %}
     </div>
-    <div class="cti-card">
-      <div class="cti-card-title">ASN / Organisation</div>
-      <div style="font-size:8.5pt;color:#1e293b;">{{ osint.asn_info.asn or '—' }}</div>
-      <div style="font-size:8pt;color:#374151;">{{ osint.asn_info.org or '—' }}</div>
-      <div style="font-size:8pt;color:#6b7280;">{{ osint.asn_info.country or osint.geo_info.country or '—' }}</div>
-    </div>
-    <div class="cti-card">
-      <div class="cti-card-title">Certificat SSL</div>
-      <div style="font-size:8.5pt;color:#1e293b;">{{ osint.ssl_cert.subject or '—' }}</div>
-      <div style="font-size:8pt;color:#374151;">{{ osint.ssl_cert.issuer or '—' }}</div>
-      {% if osint.ssl_cert.days_remaining is not none %}
-      <div style="font-size:8pt;font-weight:700;color:{% if osint.ssl_cert.days_remaining <= 30 %}#dc2626{% elif osint.ssl_cert.days_remaining <= 90 %}#d97706{% else %}#16a34a{% endif %};">
-        Expire dans {{ osint.ssl_cert.days_remaining }} jours
+
+    {% if osint.dns_records %}
+    <div class="nb"><h3>Enregistrements DNS</h3>
+      <table>
+        <tr><th style="width:14%">Type</th><th>Valeur</th></tr>
+        {% for rtype in ['A', 'AAAA', 'MX', 'NS', 'TXT', 'CNAME'] %}
+          {% for val in (osint.dns_records[rtype] or [])[:4] %}
+          <tr><td class="mono">{{ rtype }}</td><td class="mono">{{ val }}</td></tr>
+          {% endfor %}
+        {% endfor %}
+      </table></div>
+    {% endif %}
+
+    <div class="cols">
+      {% if osint.emails_found %}
+      <div class="nb"><h3>Emails exposés</h3>
+        <table>{% for e in osint.emails_found[:15] %}<tr><td class="mono">{{ e }}</td></tr>{% endfor %}</table>
+        {% if br.breach_names %}<p class="muted" style="font-size:8pt;margin-top:2mm">Fuites connues : {{ br.breach_names[:5] | join(', ') }}</p>{% endif %}
+      </div>
+      {% endif %}
+      {% if osint.open_ports %}
+      <div class="nb"><h3>Ports ouverts</h3>
+        {% for port in osint.open_ports %}<span class="tag warn mono">{{ port }}</span>{% endfor %}
       </div>
       {% endif %}
     </div>
-  </div>
 
-  <!-- WHOIS -->
-  {% if osint.whois %}
-  <h3 style="font-size:10pt;font-weight:700;color:#1e293b;margin:4mm 0 2mm;">Informations WHOIS</h3>
-  <table style="width:100%;border-collapse:collapse;font-size:8.5pt;margin-bottom:4mm;">
-    {% if osint.whois.registrar %}<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:2mm 3mm;color:#6b7280;width:35%;">Registrar</td><td style="padding:2mm 3mm;font-weight:600;color:#1e293b;">{{ osint.whois.registrar }}</td></tr>{% endif %}
-    {% if osint.whois.created %}<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:2mm 3mm;color:#6b7280;">Création</td><td style="padding:2mm 3mm;font-weight:600;color:#1e293b;">{{ osint.whois.created[:10] }}</td></tr>{% endif %}
-    {% if osint.whois.expires %}<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:2mm 3mm;color:#6b7280;">Expiration</td><td style="padding:2mm 3mm;font-weight:600;color:#1e293b;">{{ osint.whois.expires[:10] }}</td></tr>{% endif %}
-    {% if osint.whois.registrant_org %}<tr><td style="padding:2mm 3mm;color:#6b7280;">Organisation</td><td style="padding:2mm 3mm;font-weight:600;color:#1e293b;">{{ osint.whois.registrant_org }}</td></tr>{% endif %}
-  </table>
+    {% if osint.recommended_dorks %}
+    <div class="nb"><h3>Google Dorks recommandés</h3>
+      <table>{% for d in osint.recommended_dorks %}<tr><td class="mono">{{ d }}</td></tr>{% endfor %}</table>
+    </div>
+    {% endif %}
+  </section>
   {% endif %}
 
-  <!-- DNS Records -->
-  {% if osint.dns_records %}
-  <h3 style="font-size:10pt;font-weight:700;color:#1e293b;margin:4mm 0 2mm;">Enregistrements DNS</h3>
-  <table style="width:100%;border-collapse:collapse;font-size:8pt;margin-bottom:4mm;">
-    <thead><tr style="background:#f8fafc;"><th style="padding:2.5mm;text-align:left;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:7.5pt;">Type</th><th style="padding:2.5mm;text-align:left;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:7.5pt;">Valeur</th></tr></thead>
-    <tbody>
-      {% for rtype in ['A','AAAA','MX','NS','TXT','CNAME'] %}
-        {% for val in (osint.dns_records[rtype] or [])[:4] %}
-        <tr style="border-bottom:1px solid #f1f5f9;">
-          <td style="padding:2mm;font-weight:700;color:#0ea5e9;font-size:7.5pt;">{{ rtype }}</td>
-          <td style="padding:2mm;font-family:monospace;font-size:7.5pt;color:#1e293b;word-break:break-all;">{{ val }}</td>
+  {# ---------- Vulnérabilités ---------- #}
+  {% if show_vulns %}
+  <section class="section np">
+    {{ section_head('Vulnérabilités détectées', total_vulns ~ ' constat' ~ ('s' if total_vulns > 1 else '') ~ ' · par sévérité décroissante') }}
+
+    <table class="nb" style="margin-bottom:6mm">
+      <tr><th style="width:9mm">#</th><th>Vulnérabilité</th><th>Sévérité</th><th class="r">CVSS</th></tr>
+      {% for v in sorted_vulns %}
+      <tr><td class="muted num">V{{ '%02d' | format(loop.index) }}</td><td>{{ v.title }}</td><td>{{ sev_span(v.severity) }}</td><td class="r num">{{ '%.1f' | format(v.cvss_score) if v.cvss_score else '—' }}</td></tr>
+      {% endfor %}
+    </table>
+
+    {% for v in sorted_vulns %}
+    <article class="finding">
+      <div class="finding-head">
+        <span class="finding-id">V{{ '%02d' | format(loop.index) }}</span>
+        <h3 class="finding-title" style="margin:0">{{ v.title }}</h3>
+        {% if v.cvss_score %}<span class="finding-cvss mono">CVSS {{ '%.1f' | format(v.cvss_score) }}</span>{% endif %}
+      </div>
+      <p class="finding-meta">{{ sev_span(v.severity) }}{% if v.category %} · {{ v.category }}{% endif %}</p>
+      <div class="finding-body">
+        {% if v.description %}<p class="lbl">Description</p><p>{{ v.description }}</p>{% endif %}
+        {% if v.evidence %}<p class="lbl">Preuve technique</p><div class="evidence">{{ v.evidence }}</div>{% endif %}
+        {% if v.remediation %}<p class="lbl">Remédiation recommandée</p><p>{{ v.remediation }}</p>{% endif %}
+      </div>
+    </article>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {# ---------- Conformité ---------- #}
+  {% if show_comp %}
+  <section class="section np">
+    {{ section_head('Conformité', 'OWASP Top 10 · PCI-DSS v4.0 · ISO/IEC 27001:2022 · RGPD Art. 32') }}
+    <div class="stats nb">
+      <div class="stat"><p class="k">Score global</p><p class="v {{ score_cls(compliance.global_score) }}">{{ '%.0f' | format(compliance.global_score or 0) }}<span class="muted" style="font-size:9pt;font-weight:400"> / 100</span></p><p class="s">Note {{ compliance.global_grade }}</p></div>
+      {% for fw in compliance.frameworks or [] %}
+      <div class="stat"><p class="k">{{ fw.framework }}</p><p class="v {{ score_cls(fw.overall_score) }}">{{ '%.0f' | format(fw.overall_score or 0) }}</p><p class="s">Note {{ fw.grade }}</p></div>
+      {% endfor %}
+    </div>
+    {% if compliance.summary %}<p style="margin-bottom:5mm">{{ compliance.summary }}</p>{% endif %}
+
+    {% for fw in compliance.frameworks or [] %}
+    <div class="fw">
+      <div class="fw-head">
+        <span class="fw-grade">{{ fw.grade }}</span>
+        <div><p class="fw-name">{{ fw.framework }} {{ fw.version or '' }}</p>
+          <p class="fw-sub">{{ fw.passed or 0 }} conformes · {{ fw.partial or 0 }} partiels · {{ fw.failed or 0 }} non conformes{% if fw.na %} · {{ fw.na }} N/A{% endif %}</p></div>
+        <span class="fw-score {{ score_cls(fw.overall_score) }}">{{ '%.0f' | format(fw.overall_score or 0) }}<small> / 100</small></span>
+      </div>
+      {% if fw.compliance_statement %}<p class="fw-stmt">{{ fw.compliance_statement }}</p>{% endif %}
+      <table>
+        <tr><th style="width:12%">Contrôle</th><th>Intitulé</th><th style="width:18%">Statut</th><th class="r" style="width:12%">Score</th></tr>
+        {% for c in fw.controls or [] %}
+        <tr>
+          <td class="mono">{{ c.id }}</td>
+          <td>{{ c.title }}</td>
+          <td>{% if c.status == 'pass' %}<span class="tag ok">Conforme</span>{% elif c.status == 'fail' %}<span class="tag fail">Non conforme</span>{% elif c.status == 'partial' %}<span class="tag warn">Partiel</span>{% else %}<span class="tag">N/A</span>{% endif %}</td>
+          <td class="r num {{ score_cls(c.score) }}">{{ c.score ~ ' %' if c.score is not none else '—' }}</td>
         </tr>
         {% endfor %}
-      {% endfor %}
-    </tbody>
-  </table>
-  {% endif %}
-
-  <!-- Technologies -->
-  {% if osint.technologies and (osint.technologies.server or osint.technologies.frameworks) %}
-  <h3 style="font-size:10pt;font-weight:700;color:#1e293b;margin:4mm 0 2mm;">Technologies Détectées</h3>
-  <div style="margin-bottom:4mm;">
-    {% if osint.technologies.server %}<p style="font-size:8.5pt;margin-bottom:1mm;"><strong>Serveur :</strong> <span style="font-family:monospace;">{{ osint.technologies.server }}</span></p>{% endif %}
-    {% if osint.technologies.cms %}<p style="font-size:8.5pt;margin-bottom:1mm;"><strong>CMS :</strong> {{ osint.technologies.cms }}</p>{% endif %}
-    {% if osint.technologies.frameworks %}
-    <div style="display:flex;flex-wrap:wrap;gap:2mm;margin-top:2mm;">
-      {% for fw in osint.technologies.frameworks %}
-      <span style="background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;border-radius:4px;padding:1px 6px;font-size:7.5pt;font-weight:600;">{{ fw }}</span>
-      {% endfor %}
+      </table>
     </div>
-    {% endif %}
-  </div>
-  {% endif %}
-
-  <!-- Breaches + GitHub + Emails row -->
-  <div class="cti-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:4mm;">
-    <div class="cti-card {% if osint.breach_data and osint.breach_data.breaches_found > 0 %}card-critical{% endif %}" style="{% if osint.breach_data and osint.breach_data.breaches_found > 0 %}background:#fee2e2;border-color:#fca5a5;{% endif %}">
-      <div class="cti-card-title" style="{% if osint.breach_data and osint.breach_data.breaches_found > 0 %}color:#dc2626;{% endif %}">Data Breaches</div>
-      <div style="font-size:22pt;font-weight:800;color:{% if osint.breach_data and osint.breach_data.breaches_found > 0 %}#dc2626{% else %}#16a34a{% endif %};">{{ osint.breach_data.breaches_found if osint.breach_data else 0 }}</div>
-      {% if osint.breach_data and osint.breach_data.breach_names %}
-      <div style="font-size:7.5pt;color:#374151;margin-top:1mm;">{{ osint.breach_data.breach_names[:3] | join(', ') }}</div>
-      {% endif %}
-    </div>
-    <div class="cti-card {% if osint.github_exposure and osint.github_exposure.leaks_found > 0 %}card-medium{% endif %}" style="{% if osint.github_exposure and osint.github_exposure.leaks_found > 0 %}background:#fffbeb;border-color:#fcd34d;{% endif %}">
-      <div class="cti-card-title">GitHub Exposure</div>
-      <div style="font-size:22pt;font-weight:800;color:{% if osint.github_exposure and osint.github_exposure.leaks_found > 0 %}#d97706{% else %}#16a34a{% endif %};">~{{ osint.github_exposure.leaks_found if osint.github_exposure else 0 }}</div>
-      <div style="font-size:7.5pt;color:#6b7280;margin-top:1mm;">résultats contenant mots-clés sensibles</div>
-    </div>
-    <div class="cti-card">
-      <div class="cti-card-title">Emails Exposés</div>
-      <div style="font-size:22pt;font-weight:800;color:{% if osint.emails_found %}#d97706{% else %}#16a34a{% endif %};">{{ osint.emails_found | length if osint.emails_found else 0 }}</div>
-      {% if osint.emails_found %}
-      <div style="font-size:7.5pt;color:#374151;margin-top:1mm;">{{ osint.emails_found[:2] | join(', ') }}{% if osint.emails_found | length > 2 %}…{% endif %}</div>
-      {% endif %}
-    </div>
-  </div>
-
-  <!-- Open Ports -->
-  {% if osint.open_ports %}
-  <h3 style="font-size:10pt;font-weight:700;color:#dc2626;margin:4mm 0 2mm;">Ports Ouverts Détectés</h3>
-  <div style="display:flex;flex-wrap:wrap;gap:2mm;margin-bottom:4mm;">
-    {% for port in osint.open_ports %}
-    <span style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;border-radius:4px;padding:2px 8px;font-size:9pt;font-family:monospace;font-weight:700;">{{ port }}</span>
     {% endfor %}
-  </div>
+  </section>
   {% endif %}
 
-  <!-- Recommended Dorks -->
-  {% if osint.recommended_dorks %}
-  <h3 style="font-size:10pt;font-weight:700;color:#1e293b;margin:4mm 0 2mm;">Google Dorks Recommandés</h3>
-  {% for dork in osint.recommended_dorks %}
-  <div style="font-family:monospace;font-size:7.5pt;background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;padding:2mm 3mm;margin-bottom:1.5mm;color:#1e293b;word-break:break-all;">{{ dork }}</div>
-  {% endfor %}
+  {# ---------- Scénarios d'attaque ---------- #}
+  {% if show_ap %}
+  <section class="section np">
+    {{ section_head("Scénarios d'attaque", "Identifiés par l'IA à partir des constats") }}
+    {% for a in ap_data.attack_paths %}
+    <article class="ap">
+      <div class="ap-head">
+        <h3 class="ap-title" style="margin:0">{{ a.name or a.title or a.scenario or ('Scénario ' ~ loop.index) }}</h3>
+        {% if a.severity %}{{ sev_span(a.severity) }}{% endif %}
+      </div>
+      {% if a.probability or a.mitre_tactics %}
+      <p class="ap-meta">{% if a.probability %}Probabilité {{ {'high': 'élevée', 'medium': 'moyenne', 'low': 'faible'}.get(a.probability, a.probability) }}{% endif %}{% if a.probability and a.mitre_tactics %} · {% endif %}{% if a.mitre_tactics %}{{ a.mitre_tactics | join(' → ') }}{% endif %}</p>
+      {% endif %}
+      {% if a.prerequisites %}<p style="font-size:8.5pt;margin-bottom:2mm"><span class="muted">Prérequis :</span> {{ a.prerequisites }}</p>{% endif %}
+      {% if a.steps %}<ol class="steps">{% for st in a.steps %}<li>{{ st }}</li>{% endfor %}</ol>
+      {% elif a.description %}<p>{{ a.description }}</p>{% endif %}
+      {% if a.impact %}<p class="ap-foot"><b>Impact :</b> {{ a.impact }}</p>{% endif %}
+      {% if a.mitre_techniques %}<p style="margin-top:2.5mm">{% for t in a.mitre_techniques %}<span class="tag mono">{{ t }}</span>{% endfor %}</p>{% endif %}
+    </article>
+    {% endfor %}
+  </section>
   {% endif %}
-</div>
-{% endif %}
 
-
-{# ================================================================
-   CHEMINS D'ATTAQUE & REMÉDIATION
-   ================================================================ #}
-{% if attack_paths.attack_paths or attack_paths.top_priorities %}
-<div class="section">
-  <div class="section-header">
-    <div class="section-num">0+</div>
-    <div>
-      <div class="section-title">Chemins d'Attaque &amp; Plan de Remédiation</div>
-      <div class="section-desc">Scénarios d'exploitation identifiés par l'IA et actions prioritaires</div>
+  {# ---------- Plan de remédiation ---------- #}
+  {% if show_prio %}
+  <section class="section">
+    {{ section_head('Plan de remédiation', 'Actions classées par priorité') }}
+    {% for p in ap_data.top_priorities %}
+    <div class="prio">
+      <span class="prio-n">{{ p.rank or loop.index }}</span>
+      <div>
+        <p class="prio-a">{{ p.action }}</p>
+        {% if p.reason %}<p class="prio-r">{{ p.reason }}</p>{% endif %}
+        <p class="prio-m">Effort : {{ p.effort or '—' }} · Impact attendu : {{ p.impact_if_fixed or '—' }}</p>
+      </div>
     </div>
-  </div>
-
-  {% if attack_paths.attack_paths %}
-  <h3>Scénarios d'Attaque</h3>
-  {% for ap in attack_paths.attack_paths %}
-  <div class="ap-card">
-    <div class="ap-title">{{ ap.title or ap.scenario or ('Scénario ' ~ loop.index) }}</div>
-    {% if ap.steps %}
-    {% for step in ap.steps %}<div class="ap-step"><span class="ap-arrow">→</span><span>{{ step }}</span></div>{% endfor %}
-    {% elif ap.description %}
-    <div style="font-size:9pt;color:#374151;">{{ ap.description }}</div>
-    {% endif %}
-    {% if ap.impact %}<div style="margin-top:2mm;font-size:8.5pt;color:#ea580c;"><strong>Impact :</strong> {{ ap.impact }}</div>{% endif %}
-  </div>
-  {% endfor %}
+    {% endfor %}
+  </section>
   {% endif %}
 
-  {% if attack_paths.top_priorities %}
-  <h3>Plan de Remédiation Priorisé</h3>
-  {% for p in attack_paths.top_priorities %}
-  <div class="prio-card">
-    <div class="prio-num">{{ p.rank or loop.index }}</div>
-    <div style="flex:1;">
-      <div class="prio-action">{{ p.action }}</div>
-      <div class="prio-reason">{{ p.reason }}</div>
-      <div class="prio-meta">Effort : <span>{{ p.effort or '—' }}</span> &nbsp;·&nbsp; Impact attendu : <span>{{ p.impact_if_fixed or '—' }}</span></div>
+  {# ---------- Méthodologie ---------- #}
+  <section class="section nb">
+    {{ section_head('Méthodologie', 'Échelles utilisées dans ce rapport') }}
+    <div class="cols">
+      <div>
+        <h3>Sévérité des vulnérabilités</h3>
+        <table>
+          <tr><th>Niveau</th><th class="r">CVSS v3.1</th></tr>
+          <tr><td>{{ sev_span('critical') }}</td><td class="r num">9.0 – 10.0</td></tr>
+          <tr><td>{{ sev_span('high') }}</td><td class="r num">7.0 – 8.9</td></tr>
+          <tr><td>{{ sev_span('medium') }}</td><td class="r num">4.0 – 6.9</td></tr>
+          <tr><td>{{ sev_span('low') }}</td><td class="r num">0.1 – 3.9</td></tr>
+          <tr><td>{{ sev_span('info') }}</td><td class="r num">0.0</td></tr>
+        </table>
+      </div>
+      <div>
+        <h3>Score de risque global</h3>
+        <p style="font-size:8.5pt">Note sur 10 agrégeant le nombre et la sévérité des constats, ainsi que leur exploitabilité. Elle permet de suivre l'évolution d'une même cible entre deux analyses.</p>
+        <h3>Limites</h3>
+        <p style="font-size:8.5pt">Analyse automatisée et non intrusive, réalisée depuis Internet à la date indiquée. Elle ne remplace pas un test d'intrusion manuel. Les éléments générés par l'IA doivent être validés par une personne qualifiée.</p>
+      </div>
     </div>
-  </div>
-  {% endfor %}
-  {% endif %}
+    <p class="legal">Rapport généré automatiquement par SuturaSec le {{ generated_at }}. Il contient des informations confidentielles destinées exclusivement au destinataire désigné. Toute divulgation ou reproduction sans autorisation est interdite.</p>
+  </section>
+
 </div>
-{% endif %}
-
-
-{# Confidential footer #}
-<div class="conf-footer">
-  Ce rapport a été généré automatiquement par <strong>SuturaSec</strong> le {{ generated_at }}.
-  Il contient des informations confidentielles destinées exclusivement au destinataire désigné.
-  Toute divulgation ou reproduction sans autorisation est interdite.
-</div>
-
-
-<button id="print-btn" onclick="window.print()">
-  <svg viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-  Télécharger PDF
-</button>
-
 </body>
 </html>
