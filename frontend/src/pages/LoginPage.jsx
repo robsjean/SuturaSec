@@ -1,12 +1,16 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Shield } from 'lucide-react'
+import { Eye } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import AuthLayout, { FormError } from '../components/AuthLayout'
+import { apiError } from '../lib/scan'
 
 export default function LoginPage() {
   const { login } = useAuth()
   const navigate = useNavigate()
-  const [form, setForm] = useState({ username: '', password: '' })
+  const [form, setForm] = useState({ username: '', password: '', remember: false })
+  const [showForgot, setShowForgot] = useState(false)
+  const [showPwd, setShowPwd] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -15,76 +19,66 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
     try {
-      await login(form.username, form.password)
+      await login(form.username.trim(), form.password, form.remember)
       navigate('/dashboard')
     } catch (err) {
-      setError(err.response?.data?.detail || 'Erreur de connexion')
+      setError(err.response ? apiError(err, 'Identifiants incorrects.') : 'Erreur réseau. Vérifiez votre connexion.')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-indigo-600/20 border border-indigo-500/30 mb-4">
-            <Shield size={28} className="text-indigo-400" />
+    <AuthLayout>
+      <div className="auth-form">
+        <div className="stack-sm">
+          <h1>Connexion</h1>
+          <p className="muted">Accédez à vos analyses de sécurité.</p>
+        </div>
+
+        <FormError>{error}</FormError>
+
+        <form onSubmit={handleSubmit} noValidate>
+          <div className="field">
+            <label htmlFor="login-user">Nom d'utilisateur ou email</label>
+            <input className="input" id="login-user" type="text" required autoComplete="username" autoCapitalize="none"
+                   spellCheck={false} aria-invalid={!!error} value={form.username}
+                   onChange={(e) => setForm({ ...form, username: e.target.value })} />
           </div>
-          <h1 className="text-2xl font-bold text-white">SamaSecurity</h1>
-          <p className="text-gray-400 mt-1 text-sm">Security as a Service</p>
-        </div>
-
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-8">
-          <h2 className="text-lg font-semibold mb-6">Connexion</h2>
-
-          {error && (
-            <div className="bg-red-900/30 border border-red-800 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">
-              {error}
+          <div className="field">
+            <div className="row between">
+              <label htmlFor="login-pwd">Mot de passe</label>
+              <button type="button" className="link-btn small" onClick={() => setShowForgot(!showForgot)}
+                      aria-expanded={showForgot} aria-controls="forgot-help">Mot de passe oublié ?</button>
             </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">Nom d'utilisateur</label>
-              <input
-                type="text"
-                value={form.username}
-                onChange={(e) => setForm({ ...form, username: e.target.value })}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition-colors"
-                placeholder="username"
-                required
-              />
+            {showForgot && (
+              <p className="note small" id="forgot-help" style={{ padding: '10px 12px' }}>
+                La réinitialisation en ligne n'est pas encore disponible. Contactez l'administrateur de votre espace SuturaSec pour obtenir un nouveau mot de passe.
+              </p>
+            )}
+            <div className="pw-wrap">
+              <input className="input" id="login-pwd" type={showPwd ? 'text' : 'password'} required autoComplete="current-password"
+                     aria-invalid={!!error} value={form.password}
+                     onChange={(e) => setForm({ ...form, password: e.target.value })} />
+              <button type="button" onClick={() => setShowPwd(!showPwd)} aria-label={showPwd ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}>
+                <Eye size={16} strokeWidth={1.8} aria-hidden="true" />
+              </button>
             </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">Mot de passe</label>
-              <input
-                type="password"
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition-colors"
-                placeholder="••••••••"
-                required
-              />
-            </div>
+          </div>
+          <label className="toggle">
+            <input type="checkbox" checked={form.remember} onChange={(e) => setForm({ ...form, remember: e.target.checked })} />
+            Rester connecté 30 jours
+          </label>
+          <button className="btn btn-ink btn-lg btn-block" type="submit" disabled={loading || !form.username || !form.password}>
+            {loading && <span className="spinner" aria-hidden="true" />}
+            {loading ? 'Connexion…' : 'Se connecter'}
+          </button>
+        </form>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors mt-2"
-            >
-              {loading ? 'Connexion...' : 'Se connecter'}
-            </button>
-          </form>
-
-          <p className="text-center text-sm text-gray-500 mt-4">
-            Pas encore de compte ?{' '}
-            <Link to="/register" className="text-indigo-400 hover:text-indigo-300">
-              S'inscrire
-            </Link>
-          </p>
-        </div>
+        <p className="small muted" style={{ textAlign: 'center' }}>
+          Pas encore de compte ? <Link to="/register">Créer un compte</Link>
+        </p>
       </div>
-    </div>
+    </AuthLayout>
   )
 }
