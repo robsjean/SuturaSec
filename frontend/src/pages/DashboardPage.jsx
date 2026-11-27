@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, RefreshCw, Search, ShieldCheck, Trash2 } from 'lucide-react'
+import { FileDown, Plus, RefreshCw, Search, ShieldCheck, Trash2 } from 'lucide-react'
 import Layout from '../components/Layout'
 import NewScanDialog from '../components/NewScanDialog'
 import { scansApi } from '../services/api'
 import { SCAN_TYPES, SCAN_TYPE, STATUS, fmtDate, riskCls, scoreBar } from '../lib/scan'
+import { openReport } from '../lib/report'
+import { toast } from '../lib/toast'
 
 const FRAMEWORKS = [['OWASP Top 10', 'OWASP Top 10'], ['PCI-DSS', 'PCI-DSS'], ['ISO 27001', 'ISO 27001'], ['RGPD', 'GDPR']]
 const SEV_ROWS = [['critical', 'Critique', 'critical_count'], ['high', 'Élevée', 'high_count'], ['medium', 'Moyenne', 'medium_count'], ['low', 'Faible', 'low_count']]
@@ -25,6 +27,8 @@ export default function DashboardPage() {
   const [query, setQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState('')
   const [frameworks, setFrameworks] = useState(null)
+  const view = params.get('view') === 'rapports' ? 'rapports' : 'all'
+  const setView = (v) => setParams(v === 'rapports' ? { view: 'rapports' } : {}, { replace: true })
 
   const fetchScans = useCallback(async () => {
     try {
@@ -52,9 +56,14 @@ export default function DashboardPage() {
     const t = params.get('scan')
     if (t) {
       setDialogType(SCAN_TYPE[t] ? t : 'web')
-      setParams({}, { replace: true })
+      setParams(view === 'rapports' ? { view: 'rapports' } : {}, { replace: true })
     }
   }, [params, setParams])
+
+  // « Rapports » depuis la barre latérale : on amène la liste à l'écran
+  useEffect(() => {
+    if (view === 'rapports') document.getElementById('rapports')?.scrollIntoView({ block: 'start' })
+  }, [view])
 
   const completed = useMemo(() => scans.filter((s) => s.status === 'completed'), [scans])
   const complianceScan = scans.find((s) => s.compliance_score != null) || null
@@ -72,7 +81,8 @@ export default function DashboardPage() {
   const riskRows = completed.filter((s) => s.risk_score != null).slice(0, 10)
 
   const q = query.trim().toLowerCase()
-  const filtered = scans.filter((s) => (!q || s.target.toLowerCase().includes(q)) && (!typeFilter || s.scan_type === typeFilter))
+  const listed = view === 'rapports' ? completed : scans
+  const filtered = listed.filter((s) => (!q || s.target.toLowerCase().includes(q)) && (!typeFilter || s.scan_type === typeFilter))
 
   const handleDelete = async (scan, e) => {
     e.stopPropagation()
@@ -161,10 +171,14 @@ export default function DashboardPage() {
           </section>
         )}
 
-        <section className="card" aria-labelledby="hist">
+        <section className="card" aria-labelledby="hist" id="rapports">
           <div className="card-head">
-            <h2 id="hist">Historique des analyses</h2>
+            <h2 id="hist">{view === 'rapports' ? 'Rapports disponibles' : 'Historique des analyses'}</h2>
             <div className="row">
+              <div className="segmented" role="group" aria-label="Affichage">
+                <button type="button" aria-pressed={view === 'all'} onClick={() => setView('all')}>Historique</button>
+                <button type="button" aria-pressed={view === 'rapports'} onClick={() => setView('rapports')}>Rapports PDF</button>
+              </div>
               <label className="search">
                 <Search size={14} strokeWidth={2} aria-hidden="true" />
                 <input type="search" placeholder="Rechercher une cible" aria-label="Rechercher une cible" value={query} onChange={(e) => setQuery(e.target.value)} />
@@ -190,6 +204,11 @@ export default function DashboardPage() {
               <p style={{ maxWidth: '44ch' }}>Lancez une première analyse sur un site, une API, un domaine ou une plage réseau que vous êtes autorisé à tester.</p>
               <button className="btn btn-primary" type="button" style={{ marginTop: 8 }} onClick={() => setDialogType('web')}>Nouvelle analyse</button>
             </div>
+          ) : view === 'rapports' && completed.length === 0 ? (
+            <div className="empty">
+              <h2>Aucun rapport pour l'instant</h2>
+              <p style={{ maxWidth: '44ch' }}>Un rapport PDF est disponible dès qu'une analyse est terminée.</p>
+            </div>
           ) : (
             <div className="table-wrap">
               <table style={{ minWidth: 760 }}>
@@ -208,8 +227,14 @@ export default function DashboardPage() {
                         <td className="num">{findings(s)}</td>
                         <td className="r num"><b style={{ fontWeight: 500 }} className={riskCls(s.risk_score)}>{s.risk_score != null ? s.risk_score.toFixed(1) : '—'}</b></td>
                         <td className="r num muted">{fmtDate(s.created_at)}</td>
-                        <td className="r">
-                          <button className="btn btn-ghost icon-btn row-actions" type="button" onClick={(e) => handleDelete(s, e)} aria-label={`Supprimer l'analyse ${s.target}`}>
+                        <td className="r" style={{ whiteSpace: 'nowrap' }}>
+                          {s.status === 'completed' && (
+                            <button className="btn btn-ghost icon-btn" type="button" title="Rapport PDF"
+                                    onClick={(e) => { e.stopPropagation(); openReport(s.id) }} aria-label={`Ouvrir le rapport PDF de ${s.target}`}>
+                              <FileDown size={15} strokeWidth={1.8} aria-hidden="true" />
+                            </button>
+                          )}
+                          <button className="btn btn-ghost icon-btn row-actions" title="Supprimer" type="button" onClick={(e) => handleDelete(s, e)} aria-label={`Supprimer l'analyse ${s.target}`}>
                             <Trash2 size={15} strokeWidth={1.8} aria-hidden="true" />
                           </button>
                         </td>
@@ -230,7 +255,12 @@ export default function DashboardPage() {
         <NewScanDialog
           initialType={dialogType}
           onClose={() => setDialogType(null)}
-          onCreated={(scan) => navigate(`/scans/${scan.id}`)}
+          onCreated={(scan) => {
+            setDialogType(null)
+            setView('all')
+            toast(`Analyse lancée sur ${scan.target}. Les résultats s'afficheront automatiquement, vous pouvez quitter cette page.`)
+            fetchScans()
+          }}
         />
       )}
     </Layout>

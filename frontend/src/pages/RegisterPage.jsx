@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import { Check, Circle, Eye } from 'lucide-react'
 import { authApi } from '../services/api'
 import AuthLayout, { FormError } from '../components/AuthLayout'
@@ -22,6 +23,9 @@ export default function RegisterPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [autoLoggedIn, setAutoLoggedIn] = useState(false)
+  const { login } = useAuth()
+  const navigate = useNavigate()
 
   const checks = checksFor(form.password)
   const strength = strengthOf(checks.filter((c) => c.ok).length)
@@ -40,6 +44,12 @@ export default function RegisterPage() {
     try {
       await authApi.register({ email: form.email.trim(), username: form.username.trim(), password: form.password })
       setSuccess(true)
+      // Connexion automatique : pas besoin de ressaisir ses identifiants
+      try {
+        await login(form.username.trim(), form.password)
+        setAutoLoggedIn(true)
+        setTimeout(() => navigate('/dashboard'), 900)
+      } catch { /* repli : bouton « Se connecter » */ }
     } catch (err) {
       setError(err.response ? apiError(err, "Erreur lors de l'inscription.") : 'Erreur réseau. Vérifiez votre connexion.')
     } finally {
@@ -56,9 +66,9 @@ export default function RegisterPage() {
           </span>
           <div className="stack-sm">
             <h1>Compte créé</h1>
-            <p className="muted">Votre espace est prêt. Connectez-vous pour lancer votre première analyse.</p>
+            <p className="muted">{autoLoggedIn ? 'Connexion à votre espace…' : 'Votre espace est prêt. Connectez-vous pour lancer votre première analyse.'}</p>
           </div>
-          <Link className="btn btn-ink btn-lg btn-block" to="/login">Se connecter</Link>
+          {!autoLoggedIn && <Link className="btn btn-ink btn-lg btn-block" to="/login">Se connecter</Link>}
         </div>
       </AuthLayout>
     )

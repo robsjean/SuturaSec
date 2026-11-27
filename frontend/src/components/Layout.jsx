@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { LayoutGrid, LogOut, Menu, Moon, ShieldCheck, Sun } from 'lucide-react'
+import { FileText, LayoutGrid, LogOut, Menu, Moon, ShieldCheck, Sun, X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { SCAN_TYPES } from '../lib/scan'
 import { useTheme } from '../lib/theme'
+import { useToast } from '../lib/toast'
 
 const COMING_SOON = ['Cloud Security', 'Phishing Simulator', 'Comparaison de scans']
 
@@ -13,6 +14,7 @@ export default function Layout({ children }) {
   const navigate = useNavigate()
   const [isDark, toggleTheme] = useTheme()
   const [open, setOpen] = useState(false)
+  const [toast, closeToast] = useToast()
 
   useEffect(() => setOpen(false), [location.pathname, location.search])
   useEffect(() => {
@@ -21,7 +23,8 @@ export default function Layout({ children }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  const onDashboard = location.pathname === '/dashboard' || location.pathname.startsWith('/scans/')
+  const onReports = location.pathname === '/dashboard' && new URLSearchParams(location.search).get('view') === 'rapports'
+  const onDashboard = !onReports && (location.pathname === '/dashboard' || location.pathname.startsWith('/scans/'))
 
   const handleLogout = () => {
     logout()
@@ -49,6 +52,10 @@ export default function Layout({ children }) {
           <Link to="/dashboard" aria-current={onDashboard ? 'page' : undefined}>
             <LayoutGrid size={16} strokeWidth={1.8} aria-hidden="true" />
             Tableau de bord
+          </Link>
+          <Link to="/dashboard?view=rapports" aria-current={onReports ? 'page' : undefined}>
+            <FileText size={16} strokeWidth={1.8} aria-hidden="true" />
+            Rapports
           </Link>
 
           <div className="nav-label">Nouvelle analyse</div>
@@ -83,6 +90,16 @@ export default function Layout({ children }) {
           </button>
         </div>
       </aside>
+
+      {toast && (
+        <div className={`toast${toast.type === 'error' ? ' error' : ''}`} role="status" aria-live="polite">
+          <span className={`dot ${toast.type === 'error' ? 'fail' : 'ok'}`} style={{ marginTop: 6 }} />
+          <span style={{ flex: 1 }}>{toast.message}</span>
+          <button className="btn btn-ghost icon-btn" type="button" onClick={closeToast} aria-label="Fermer la notification">
+            <X size={14} strokeWidth={1.8} aria-hidden="true" />
+          </button>
+        </div>
+      )}
 
       <main className="main">
         <div className="container">{children}</div>

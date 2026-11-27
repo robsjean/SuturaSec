@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { Check, ChevronRight, Download, Search, TriangleAlert } from 'lucide-react'
+import { Check, ChevronRight, Circle, Download, Search, TriangleAlert } from 'lucide-react'
 import Layout from '../components/Layout'
 import { scansApi } from '../services/api'
 import {
-  SCAN_TYPE, SEVS, SEV_LABEL, STATUS, fmtDate, httpCls, riskBar, riskCls, riskLabel, scoreBar, sortBySeverity,
+  SCAN_STEPS, SCAN_TYPE, SEVS, SEV_LABEL, STATUS, fmtDate, httpCls, parseDate, riskBar, riskCls, riskLabel, scoreBar, sortBySeverity,
 } from '../lib/scan'
+import { openReport } from '../lib/report'
 
 /* ---------- Petits composants ---------- */
 
@@ -546,7 +547,7 @@ function tabsFor(scan) {
 
 function duration(scan) {
   if (!scan.completed_at) return ''
-  const sec = Math.max(0, Math.round((new Date(scan.completed_at) - new Date(scan.created_at)) / 1000))
+  const sec = Math.max(0, Math.round((parseDate(scan.completed_at) - parseDate(scan.created_at)) / 1000))
   return sec < 60 ? `${sec} s` : `${Math.floor(sec / 60)} min ${String(sec % 60).padStart(2, '0')} s`
 }
 
@@ -582,10 +583,20 @@ export default function ScanDetailPage() {
   const active = tabs.some((t) => t.key === hash) ? hash : 'overview'
   const setTab = (key) => navigate({ hash: key }, { replace: true })
 
-  const openReport = () => {
-    const token = localStorage.getItem('token')
-    window.open(`/scans/${id}/report?token=${encodeURIComponent(token)}`, '_blank', 'noopener')
-  }
+  // Temps écoulé pendant l'analyse
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => {
+    if (!running) return
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [running])
+  const elapsed = (() => {
+    const start = parseDate(scan?.created_at)
+    if (!start) return ''
+    const s = Math.max(0, Math.floor((now - start.getTime()) / 1000))
+    const m = Math.floor(s / 60)
+    return m ? `${m} min ${String(s % 60).padStart(2, '0')} s écoulées` : `${s} s écoulées`
+  })()
 
   const T = scan && SCAN_TYPE[scan.scan_type]
   const st = scan && (STATUS[scan.status] || { label: scan.status, dot: '' })
@@ -627,7 +638,7 @@ export default function ScanDetailPage() {
               </div>
               {scan.status === 'completed' && (
                 <div className="actions">
-                  <button className="btn btn-ink" type="button" onClick={openReport}>
+                  <button className="btn btn-ink" type="button" onClick={() => openReport(scan.id)}>
                     <Download size={16} strokeWidth={2} aria-hidden="true" />
                     Rapport PDF
                   </button>
@@ -637,10 +648,20 @@ export default function ScanDetailPage() {
 
             {running && (
               <section className="card card-pad stack" style={{ gap: 16 }} aria-live="polite">
-                <div className="row"><span className="spinner" aria-hidden="true" />
-                  <h2>{scan.status === 'running' ? 'Analyse en cours' : 'Analyse en attente de démarrage'}</h2></div>
-                <div className="bar"><span style={{ width: '40%', background: 'var(--accent)' }} /></div>
-                <p className="small muted">Les résultats s'afficheront automatiquement. Vous pouvez quitter cette page : l'analyse continue.</p>
+                <div className="row between">
+                  <div className="row"><span className="spinner" aria-hidden="true" />
+                    <h2>{scan.status === 'running' ? 'Analyse en cours' : 'Analyse en attente de démarrage'}</h2></div>
+                  <span className="small muted num">{elapsed}</span>
+                </div>
+                <p className="small muted">Selon la cible, l'analyse prend de quelques secondes à une dizaine de minutes. Vous pouvez quitter cette page : les résultats seront enregistrés et s'afficheront ici.</p>
+                <div className="stack-sm" style={{ paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+                  <p className="label">Ce que vérifie cette analyse</p>
+                  <ul className="checks" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: '6px 24px', fontSize: 13, color: 'var(--text-2)' }}>
+                    {[...(SCAN_STEPS[scan.scan_type] || []), 'Synthèse IA et score de risque'].map((step) => (
+                      <li key={step}><Circle size={12} strokeWidth={2} aria-hidden="true" /><span>{step}</span></li>
+                    ))}
+                  </ul>
+                </div>
               </section>
             )}
 
@@ -648,7 +669,7 @@ export default function ScanDetailPage() {
               <section className="card card-pad stack">
                 <div className="note fail" role="alert">
                   <TriangleAlert size={16} strokeWidth={1.8} aria-hidden="true" />
-                  <div><b style={{ fontWeight: 600 }}>L'analyse n'a pas pu aboutir.</b><br />Vérifiez que la cible est correcte et accessible, puis relancez une analyse.</div>
+                  <div><b style={{ fontWeight: 600 }}>L'analyse n'a pas pu aboutir.</b><br />{scan.summary || 'Vérifiez que la cible est correcte et accessible, puis relancez une analyse.'}</div>
                 </div>
                 <div className="actions"><Link className="btn btn-primary" to={`/dashboard?scan=${scan.scan_type}`}>Relancer une analyse</Link></div>
               </section>

@@ -41,9 +41,16 @@
       </a>
 
       <nav class="nav" aria-label="Navigation principale">
-        <a href="/dashboard" :aria-current="isActive('/dashboard') ? 'page' : null">
+        <a href="/dashboard" :aria-current="isActive('/dashboard') && !isReports ? 'page' : null"
+           @click="if (window.location.pathname === '/dashboard') window.dispatchEvent(new CustomEvent('show-all'))">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
           Tableau de bord
+        </a>
+
+        <a href="/dashboard?view=rapports" :aria-current="isReports ? 'page' : null"
+           @click="if (window.location.pathname === '/dashboard') { $event.preventDefault(); window.dispatchEvent(new CustomEvent('show-reports')); sidebarOpen = false; }">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5"/></svg>
+          Rapports
         </a>
 
         <div class="nav-label">Nouvelle analyse</div>
@@ -78,6 +85,15 @@
         </button>
       </div>
     </aside>
+
+    <!-- Notification : window.dispatchEvent(new CustomEvent('ss-toast', { detail: { message, type } })) -->
+    <div class="toast" :class="toast?.type === 'error' && 'error'" x-show="toast" x-cloak role="status" aria-live="polite">
+      <span class="dot" :class="toast?.type === 'error' ? 'fail' : 'ok'" style="margin-top:6px"></span>
+      <span style="flex:1" x-text="toast?.message"></span>
+      <button class="btn btn-ghost icon-btn" type="button" @click="toast = null" aria-label="Fermer la notification">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
 
     <main class="main">
       <div class="container">
@@ -121,15 +137,54 @@
       cti:       '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><path d="M12 12l6-6"/></svg>',
     };
     const SS_TYPES = [
-      { key: 'web',               label: 'Web',           hint: 'OWASP Top 10, TLS, en-têtes' },
-      { key: 'authenticated_web', label: 'Authentifié',   hint: 'Tests derrière la connexion' },
-      { key: 'api',               label: 'API',           hint: 'OWASP API Top 10 (2023)' },
-      { key: 'network',           label: 'Réseau',        hint: 'Hôtes, ports et services' },
-      { key: 'subdomain',         label: 'Sous-domaines', hint: 'Découverte et takeover' },
-      { key: 'osint',             label: 'OSINT',         hint: 'WHOIS, DNS, emails, dorks' },
-      { key: 'cti',               label: 'Threat Intel',  hint: 'Réputation IP et domaine' },
+      { key: 'web', label: 'Web', hint: 'OWASP Top 10, TLS, en-têtes',
+        desc: 'Audit OWASP Top 10 : en-têtes, TLS, fichiers exposés, injections.',
+        example: 'https://example.com', targetHint: 'URL du site. Si vous omettez https://, il sera ajouté.' },
+      { key: 'authenticated_web', label: 'Authentifié', hint: 'Tests derrière la connexion',
+        desc: "Tests avec une session connectée : IDOR, CSRF, JWT, contrôle d'accès.",
+        example: 'https://app.example.com', targetHint: "URL de l'application. Vous fournirez ci-dessous un compte de test." },
+      { key: 'api', label: 'API', hint: 'OWASP API Top 10 (2023)',
+        desc: "OWASP API Top 10 : découverte d'endpoints, CORS, limitation de débit.",
+        example: 'https://api.example.com', targetHint: "URL de base de l'API (ex. https://api.example.com ou https://example.com/api)." },
+      { key: 'network', label: 'Réseau', hint: 'Hôtes, ports et services',
+        desc: 'Ports ouverts et services exposés sur les ports les plus courants.',
+        example: '203.0.113.10', targetHint: "IP, nom de domaine, plage CIDR (jusqu'à /24) ou plage 192.168.1.1-20." },
+      { key: 'subdomain', label: 'Sous-domaines', hint: 'Découverte et takeover',
+        desc: 'Recense les sous-domaines et détecte les risques de prise de contrôle.',
+        example: 'example.com', targetHint: 'Nom de domaine racine, sans https:// (ex. example.com).' },
+      { key: 'osint', label: 'OSINT', hint: 'WHOIS, DNS, emails, dorks',
+        desc: 'Reconnaissance passive : informations publiques exposées sur le domaine.',
+        example: 'example.com', targetHint: 'Nom de domaine, sans https:// (ex. example.com).' },
+      { key: 'cti', label: 'Threat Intel', hint: 'Réputation IP et domaine',
+        desc: 'Réputation et menaces connues associées à un domaine ou une IP.',
+        example: 'example.com', targetHint: 'Nom de domaine ou adresse IP.' },
     ].map(t => ({ ...t, icon: SS_ICON[t.key] }));
     const SS_TYPE_LABEL = Object.fromEntries(SS_TYPES.map(t => [t.key, t.label]));
+
+    /* Les dates de l'API sont en UTC sans fuseau : on force l'interprétation UTC */
+    function ssDate(raw) {
+      if (!raw) return null;
+      return new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(raw) ? raw : raw + 'Z');
+    }
+
+    function ssToast(message, type = 'success') {
+      window.dispatchEvent(new CustomEvent('ss-toast', { detail: { message, type } }));
+    }
+
+    /* Rapport : onglet ouvert dans le geste utilisateur (sinon bloqué comme popup), puis
+       redirigé vers un lien à portée limitée. Le token de session ne quitte jamais la page. */
+    async function ssOpenReport(scanId) {
+      const win = window.open('', '_blank');
+      try {
+        const res = await apiFetch(`/scans/${scanId}/report-link`, { method: 'POST' });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || 'Rapport indisponible.');
+        const { url } = await res.json();
+        if (win) win.location.href = url; else window.location.href = url;
+      } catch (e) {
+        if (win) win.close();
+        ssToast(e.message || "Impossible d'ouvrir le rapport.", 'error');
+      }
+    }
 
     function layoutApp() {
       return {
@@ -138,9 +193,18 @@
         isDark: document.documentElement.classList.contains('dark'),
         scanTypes: SS_TYPES,
         comingSoon: ['Cloud Security', 'Phishing Simulator', 'Comparaison de scans'],
+        isReports: new URLSearchParams(window.location.search).get('view') === 'rapports',
+        toast: null,
+        _toastTimer: null,
 
         async init() {
           requireAuth();
+          window.addEventListener('ss-toast', (e) => {
+            this.toast = { message: e.detail?.message || '', type: e.detail?.type || 'success' };
+            clearTimeout(this._toastTimer);
+            this._toastTimer = setTimeout(() => { this.toast = null; }, 6000);
+          });
+          window.addEventListener('ss-list-view', (e) => { this.isReports = e.detail === 'rapports'; });
           try {
             const res = await apiFetch('/auth/me');
             if (res.ok) this.user = await res.json();

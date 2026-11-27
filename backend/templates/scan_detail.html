@@ -41,17 +41,28 @@
 
       <!-- En cours -->
       <section class="card card-pad stack" style="gap:16px" x-show="scan.status === 'running' || scan.status === 'pending'" aria-live="polite">
-        <div class="row"><span class="spinner" aria-hidden="true"></span>
-          <h2 x-text="scan.status === 'running' ? 'Analyse en cours' : 'Analyse en attente de démarrage'"></h2></div>
-        <div class="bar"><span style="width:40%;background:var(--accent)"></span></div>
-        <p class="small muted">Les résultats s'afficheront automatiquement. Vous pouvez quitter cette page : l'analyse continue.</p>
+        <div class="row between">
+          <div class="row"><span class="spinner" aria-hidden="true"></span>
+            <h2 x-text="scan.status === 'running' ? 'Analyse en cours' : 'Analyse en attente de démarrage'"></h2></div>
+          <span class="small muted num" x-text="elapsedLabel"></span>
+        </div>
+        <p class="small muted">Selon la cible, l'analyse prend de quelques secondes à une dizaine de minutes. Vous pouvez quitter cette page : les résultats seront enregistrés et s'afficheront ici.</p>
+        <div class="stack-sm" style="padding-top:12px;border-top:1px solid var(--border)">
+          <p class="label">Ce que vérifie cette analyse</p>
+          <ul class="checks" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:6px 24px;font-size:13px;color:var(--text-2)">
+            <template x-for="step in scanSteps" :key="step">
+              <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="6"/></svg><span x-text="step"></span></li>
+            </template>
+          </ul>
+        </div>
       </section>
 
       <!-- Échec -->
       <section class="card card-pad stack" x-show="scan.status === 'failed'">
         <div class="note fail" role="alert">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 3l10 18H2L12 3z"/><path d="M12 10v4M12 17.5v.5"/></svg>
-          <div><b style="font-weight:600">L'analyse n'a pas pu aboutir.</b><br>Vérifiez que la cible est correcte et accessible, puis relancez une analyse.</div>
+          <div><b style="font-weight:600">L'analyse n'a pas pu aboutir.</b><br>
+            <span x-text="scan.summary || 'Vérifiez que la cible est correcte et accessible, puis relancez une analyse.'"></span></div>
         </div>
         <div class="actions"><a class="btn btn-primary" :href="'/dashboard?scan=' + scan.scan_type">Relancer une analyse</a></div>
       </section>
@@ -583,6 +594,7 @@ function scanDetailApp(scanId) {
     subFilter: '', subQuery: '',
     epQuery: '',
     fwIndex: 0,
+    now: Date.now(),
 
     get ai()     { return this.scan?.attack_paths || {}; },
     get ti()     { return this.scan?.threat_intel || null; },
@@ -625,9 +637,34 @@ function scanDetailApp(scanId) {
         (this.subFilter !== 'active' || s.status_code != null) &&
         (this.subFilter !== 'takeover' || s.takeover_risk));
     },
+    // Vérifications effectuées par chaque scanner (liste informative, pas une progression)
+    get scanSteps() {
+      const steps = {
+        web: ['HTTPS et certificat TLS', 'En-têtes de sécurité', 'Cookies et CORS', 'Fichiers sensibles exposés',
+              'Méthodes HTTP autorisées', "Injections SQL et XSS (paramètres d'URL)", 'Redirections ouvertes', 'Limitation de débit'],
+        authenticated_web: ['Connexion avec le compte fourni', 'Sécurité de la session et des en-têtes', 'Robustesse du JWT',
+              "Contrôle d'accès et IDOR", 'Protection CSRF', 'Exposition de données sensibles',
+              'Mass assignment', 'Injection SQL et limitation de débit sur la connexion'],
+        api: ['Découverte des endpoints et de la doc (Swagger/OpenAPI)', 'Audit de chaque endpoint', 'Politique CORS',
+              'Limitation de débit', 'GraphQL', 'En-têtes de sécurité et méthodes HTTP'],
+        network: ['Résolution de la cible', 'Scan des ports les plus courants', 'Identification des services exposés',
+                  'Services à risque (bases de données, Docker, Redis…)'],
+        subdomain: ['Énumération des sous-domaines', 'Résolution DNS', 'Détection des risques de prise de contrôle'],
+        osint: ['Enregistrements DNS publics', 'Informations exposées dans les sources publiques'],
+        cti: ["Réputation du domaine ou de l'IP", 'Présence dans les listes de menaces connues'],
+      };
+      return [...(steps[this.scan?.scan_type] || []), 'Synthèse IA et score de risque'];
+    },
+    get elapsedLabel() {
+      const start = ssDate(this.scan?.created_at);
+      if (!start) return '';
+      const s = Math.max(0, Math.floor((this.now - start.getTime()) / 1000));
+      const m = Math.floor(s / 60);
+      return m ? `${m} min ${String(s % 60).padStart(2, '0')} s écoulées` : `${s} s écoulées`;
+    },
     get duration() {
       if (!this.scan?.completed_at) return '';
-      const sec = Math.max(0, Math.round((new Date(this.scan.completed_at) - new Date(this.scan.created_at)) / 1000));
+      const sec = Math.max(0, Math.round((ssDate(this.scan.completed_at) - ssDate(this.scan.created_at)) / 1000));
       return sec < 60 ? sec + ' s' : Math.floor(sec / 60) + ' min ' + String(sec % 60).padStart(2, '0') + ' s';
     },
 
@@ -638,6 +675,9 @@ function scanDetailApp(scanId) {
       setInterval(() => {
         if (this.scan?.status === 'running' || this.scan?.status === 'pending') this.fetchScan();
       }, 3000);
+      setInterval(() => {
+        if (this.scan?.status === 'running' || this.scan?.status === 'pending') this.now = Date.now();
+      }, 1000);
     },
 
     async fetchScan() {
@@ -660,7 +700,7 @@ function scanDetailApp(scanId) {
     typeLabel(t) { return SS_TYPE_LABEL[t] || t; },
     statusLabel(s) { return { pending: 'En attente', running: 'En cours', completed: 'Terminé', failed: 'Échec' }[s] || s; },
     statusDot(s) { return { pending: 'pending', running: 'run', completed: 'ok', failed: 'fail' }[s] || ''; },
-    fmtDate(d) { return new Date(d).toLocaleString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }); },
+    fmtDate(d) { return ssDate(d).toLocaleString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }); },
     riskCls(r) { return r == null ? 'muted' : r >= 7 ? 'c-critical' : r >= 5 ? 'c-high' : r >= 3 ? 'c-medium' : 'c-ok'; },
     riskBar(r) { return r == null ? '' : r >= 7 ? 'critical' : r >= 5 ? 'high' : r >= 3 ? 'medium' : 'ok'; },
     riskLabel(r) { return r >= 7 ? 'Élevé' : r >= 4 ? 'Modéré' : 'Faible'; },
@@ -672,10 +712,7 @@ function scanDetailApp(scanId) {
     httpCls(c) { return c == null ? '' : c < 300 ? 'ok' : c < 400 ? '' : 'warn'; },
     srcLabel(s) { return { 'crt.sh': 'crt.sh', crtsh: 'crt.sh', hackertarget: 'HackerTarget', bruteforce: 'Brute-force', dns_records: 'DNS', zone_transfer: 'Zone transfer' }[s] || s || '—'; },
 
-    openReport() {
-      const token = localStorage.getItem('token');
-      window.open(`/scans/${scanId}/report?token=${encodeURIComponent(token)}`, '_blank');
-    },
+    openReport() { ssOpenReport(scanId); },
   };
 }
 </script>

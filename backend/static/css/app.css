@@ -338,3 +338,7 @@ tr:hover .row-actions,tr:focus-within .row-actions{opacity:1}
 .user { gap: 6px; }
 .table-wrap{position:relative}
 .field .hint.text-crit{color:var(--critical)}
+
+/* toast */
+.toast{position:fixed;right:20px;bottom:20px;z-index:60;max-width:380px;display:flex;align-items:flex-start;gap:10px;padding:12px 8px 12px 14px;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,.12)}
+@media (max-width:640px){.toast{left:16px;right:16px;max-width:none}}

@@ -14,9 +14,9 @@
       </span>
       <div class="stack-sm">
         <h1>Compte créé</h1>
-        <p class="muted">Votre espace est prêt. Connectez-vous pour lancer votre première analyse.</p>
+        <p class="muted" x-text="autoLoggedIn ? 'Connexion à votre espace…' : 'Votre espace est prêt. Connectez-vous pour lancer votre première analyse.'"></p>
       </div>
-      <a class="btn btn-ink btn-lg btn-block" href="/login">Se connecter</a>
+      <a class="btn btn-ink btn-lg btn-block" href="/login" x-show="!autoLoggedIn">Se connecter</a>
     </div>
 
     <!-- Formulaire -->
@@ -97,6 +97,7 @@ function registerApp() {
     form: { email: '', username: '', password: '', confirm: '' },
     error: '',
     success: false,
+    autoLoggedIn: false,
     loading: false,
     showPwd: false,
 
@@ -157,6 +158,19 @@ function registerApp() {
           return;
         }
         this.success = true;
+        // Connexion automatique : pas besoin de ressaisir ses identifiants
+        try {
+          const login = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ username: this.form.username.trim(), password: this.form.password }),
+          });
+          if (login.ok) {
+            localStorage.setItem('token', (await login.json()).access_token);
+            this.autoLoggedIn = true;
+            setTimeout(() => { window.location.href = '/dashboard'; }, 900);
+          }
+        } catch { /* repli : bouton « Se connecter » */ }
       } catch {
         this.error = 'Erreur réseau. Vérifiez votre connexion.';
       } finally {

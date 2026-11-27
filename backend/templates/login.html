@@ -19,13 +19,19 @@
 
       <form @submit.prevent="submit" autocomplete="on" novalidate>
         <div class="field">
-          <label for="login-user">Nom d'utilisateur</label>
+          <label for="login-user">Nom d'utilisateur ou email</label>
           <input class="input" id="login-user" type="text" x-model="form.username" required
                  autocomplete="username" autocapitalize="none" spellcheck="false" :aria-invalid="!!error">
         </div>
 
         <div class="field">
-          <label for="login-pwd">Mot de passe</label>
+          <div class="row between">
+            <label for="login-pwd">Mot de passe</label>
+            <button type="button" class="link-btn small" @click="showForgot = !showForgot" :aria-expanded="showForgot" aria-controls="forgot-help">Mot de passe oublié ?</button>
+          </div>
+          <p class="note small" id="forgot-help" x-show="showForgot" x-cloak style="padding:10px 12px">
+            La réinitialisation en ligne n'est pas encore disponible. Contactez l'administrateur de votre espace SuturaSec pour obtenir un nouveau mot de passe.
+          </p>
           <div class="pw-wrap">
             <input class="input" id="login-pwd" :type="showPwd ? 'text' : 'password'" x-model="form.password" required
                    autocomplete="current-password" :aria-invalid="!!error">
@@ -34,6 +40,8 @@
             </button>
           </div>
         </div>
+
+        <label class="toggle"><input type="checkbox" x-model="form.remember"> Rester connecté 30 jours</label>
 
         <button class="btn btn-ink btn-lg btn-block" type="submit" :disabled="loading || !form.username || !form.password">
           <span class="spinner" x-show="loading" x-cloak aria-hidden="true"></span>
@@ -51,10 +59,11 @@
 <script>
 function loginApp() {
   return {
-    form: { username: '', password: '' },
+    form: { username: '', password: '', remember: false },
     error: '',
     loading: false,
     showPwd: false,
+    showForgot: false,
 
     async submit() {
       this.error = '';
@@ -63,6 +72,7 @@ function loginApp() {
         const body = new URLSearchParams({
           username: this.form.username.trim(),
           password: this.form.password,
+          remember: this.form.remember ? 'true' : 'false',
         });
         const res = await fetch('/api/auth/login', {
           method: 'POST',
